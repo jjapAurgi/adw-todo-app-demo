@@ -115,11 +115,26 @@ module Adw
         env = claude_env
 
         begin
-          # Execute Claude Code and capture output
-          stdout, stderr_output, status = Open3.capture3(env, *cmd)
-          File.write(request.output_file, stdout)
+          stderr_output = ""
+          exit_status = nil
 
-          unless status.success?
+          File.open(request.output_file, "w") do |file|
+            Open3.popen3(env, *cmd) do |_stdin, stdout, stderr, wait_thr|
+              # Drain stderr in a background thread to prevent pipe deadlock
+              stderr_thread = Thread.new { stderr.read }
+
+              # Write each JSONL line to disk immediately as it arrives
+              stdout.each_line do |line|
+                file.write(line)
+                file.flush
+              end
+
+              stderr_output = stderr_thread.value
+              exit_status = wait_thr.value
+            end
+          end
+
+          unless exit_status.success?
             error_msg = "Claude Code error: #{stderr_output}"
             warn error_msg
             return AgentPromptResponse.new(output: error_msg, success: false)
