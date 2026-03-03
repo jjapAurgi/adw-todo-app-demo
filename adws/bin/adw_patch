@@ -56,7 +56,13 @@ end
 
 # --- Error handling para patch tracker ---
 
-def check_patch_error(error_or_response, issue_number, error_prefix, patch_tracker, adw_id, logger)
+def restore_main_tracker_done(main_tracker, issue_number, logger)
+  Adw::Tracker.update(main_tracker, issue_number, "done", logger)
+  Adw::GitHub.transition_label(issue_number, "adw/done", "adw/error")
+  logger.info("Main tracker restaurado a: done")
+end
+
+def check_patch_error(error_or_response, issue_number, error_prefix, patch_tracker, adw_id, logger, main_tracker: nil)
   error = nil
 
   if error_or_response.is_a?(Adw::AgentPromptResponse)
@@ -69,6 +75,7 @@ def check_patch_error(error_or_response, issue_number, error_prefix, patch_track
 
   logger.error("#{error_prefix}: #{error}")
   Adw::Tracker.update_patch(patch_tracker, issue_number, "error", logger)
+  restore_main_tracker_done(main_tracker, issue_number, logger) if main_tracker
   exit 1
 end
 
@@ -430,7 +437,7 @@ end
 
 # --- Commit y push ---
 
-def commit_and_push(issue_number, adw_id, patch_tracker, logger)
+def commit_and_push(issue_number, adw_id, patch_tracker, logger, main_tracker: nil)
   stdout, _, status = Open3.capture3("git", "status", "--porcelain")
   if status.success? && stdout.strip.empty?
     logger.info("No hay cambios pendientes para commit")
@@ -446,7 +453,7 @@ def commit_and_push(issue_number, adw_id, patch_tracker, logger)
   )
 
   response = Adw::Agent.execute_template(commit_request)
-  check_patch_error(response, issue_number, "Error committing patch", patch_tracker, adw_id, logger)
+  check_patch_error(response, issue_number, "Error committing patch", patch_tracker, adw_id, logger, main_tracker: main_tracker)
   logger.info("Patch commiteado correctamente")
 
   _, stderr, push_status = Open3.capture3("git", "push")
@@ -533,14 +540,17 @@ def main
   repo_path = Adw::GitHub.extract_repo_path(Adw::GitHub.repo_url)
   issue = Adw::GitHub.fetch_issue(issue_number, repo_path)
 
-  # Paso 2: Crear patch tracker comment y pasar a "patching"
+  # Paso 2: Transicionar main tracker a "patching" (quita adw/done, añade adw/patching)
+  Adw::Tracker.update(main_tracker, issue_number, "patching", logger)
+
+  # Crear patch tracker comment y pasar a "patching"
   Adw::Tracker.update_patch(patch_tracker, issue_number, "patching", logger)
 
   # Paso 3: Crear patch plan
   logger.info("\n=== Creando patch plan ===")
   plan_path = find_original_plan(issue_number)
   patch_file, error = create_patch_plan(adw_id, comment_body, plan_path, issue_number, logger)
-  check_patch_error(error, issue_number, "Error creando patch plan", patch_tracker, adw_id, logger)
+  check_patch_error(error, issue_number, "Error creando patch plan", patch_tracker, adw_id, logger, main_tracker: main_tracker)
 
   patch_tracker[:patch_file] = patch_file
   Adw::Tracker.update_patch(patch_tracker, issue_number, "patching", logger)
@@ -558,7 +568,7 @@ def main
   Adw::Tracker.update_patch(patch_tracker, issue_number, "implementing", logger)
 
   implement_response = implement_patch(patch_file, adw_id, logger)
-  check_patch_error(implement_response, issue_number, "Error implementando patch", patch_tracker, adw_id, logger)
+  check_patch_error(implement_response, issue_number, "Error implementando patch", patch_tracker, adw_id, logger, main_tracker: main_tracker)
 
   # Paso 5: Ejecutar tests
   logger.info("\n=== Ejecutando tests ===")
@@ -578,6 +588,7 @@ def main
   if failed_count > 0
     logger.error("Tests fallidos tras patch: #{failed_count} fallos pendientes")
     Adw::Tracker.update_patch(patch_tracker, issue_number, "error", logger)
+    restore_main_tracker_done(main_tracker, issue_number, logger)
     exit 1
   end
 
@@ -590,6 +601,7 @@ def main
   if review_result[:overall_severity] == "critical" && review_result[:action_required] == "fix_and_rerun"
     logger.error("Review con hallazgos criticos irresolubles")
     Adw::Tracker.update_patch(patch_tracker, issue_number, "error", logger)
+    restore_main_tracker_done(main_tracker, issue_number, logger)
     exit 1
   end
 
@@ -611,10 +623,11 @@ def main
   logger.info("\n=== Commit y push ===")
   Adw::Tracker.update_patch(patch_tracker, issue_number, "committing", logger)
 
-  commit_and_push(issue_number, adw_id, patch_tracker, logger)
+  commit_and_push(issue_number, adw_id, patch_tracker, logger, main_tracker: main_tracker)
 
   # Paso 10: Done
   Adw::Tracker.update_patch(patch_tracker, issue_number, "done", logger)
+  Adw::Tracker.update(main_tracker, issue_number, "done", logger)
 
   logger.info("ADW Patch completado correctamente para issue ##{issue_number}")
 end
