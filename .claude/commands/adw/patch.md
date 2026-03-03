@@ -16,15 +16,18 @@ Crea un **plan de patch focalizado** para resolver un issue especifico basado en
 
 adw_id: $1
 review_change_request: $2
-spec_path: $3 si se proporciona, de lo contrario dejalo en blanco
+issue_number: $3
+spec_path: $4 si se proporciona, de lo contrario dejalo en blanco
 
 ## Instrucciones
 
 - IMPORTANTE: Estas creando un plan de patch para resolver un issue especifico de revision. Mantén los cambios pequenos, focalizados y dirigidos.
 - Lee el fichero de especificacion (spec) en `spec_path` si se proporciona para entender el contexto y los requisitos originales.
 - IMPORTANTE: Usa el `review_change_request` para entender exactamente que necesita cambiarse y usalo como base para tu patch plan.
-- Crea el patch plan en el directorio `plans/patch/` con nombre: `patch-{adw_id}-{nombre-descriptivo}.md`
+- Crea el patch plan en `.issues/{issue_number}/` con nombre: `patch-{n}-{nombre-descriptivo}.md`
+  - `{n}` es el siguiente numero secuencial. Cuenta los ficheros `patch-*.md` existentes en `.issues/{issue_number}/` y usa count+1.
   - Reemplaza `{nombre-descriptivo}` con un nombre corto basado en el issue (ej: "fix-button-color", "add-validation", "correct-layout")
+  - Crea el directorio `.issues/{issue_number}/` si no existe (`mkdir -p`).
 - IMPORTANTE: Esto es un PATCH - mantén el alcance minimo. Solo corrige lo descrito en el `review_change_request` y nada mas.
 - Ejecuta `git diff --stat`. Si hay cambios disponibles, usalos para entender que se ha hecho en el codebase y asi puedas detallar los cambios exactos en el patch plan.
 - Piensa profundamente sobre la forma mas eficiente de implementar la solucion con cambios minimos de codigo.

@@ -44,6 +44,20 @@ module Adw
       ".issues/#{issue_number}/plan.md"
     end
 
+    def post_plan_comment(issue_number, adw_id, agent_name, file_path, title, logger)
+      content = File.read(file_path)
+      body = format_issue_message(
+        adw_id, agent_name,
+        "#{title}\n\n<details>\n<summary>#{title}</summary>\n\n#{content}\n</details>"
+      )
+      comment_id = Adw::GitHub.create_issue_comment(issue_number, body)
+      logger.info("#{title} posted to issue ##{issue_number}")
+      comment_id
+    rescue Errno::ENOENT, StandardError => e
+      logger.warn("Warning: Could not post #{title.downcase} to issue: #{e.message}")
+      nil
+    end
+
     def parse_test_results(output, logger)
       json_text = extract_json_from_markdown(output)
 

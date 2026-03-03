@@ -50,6 +50,17 @@ module Adw
         lines << "| **Status** | #{emoji} #{tracker[:status]} |"
         lines << "| **Classification** | #{tracker[:classification] || "pending"} |"
         lines << "| **Branch** | #{tracker[:branch_name] ? "`#{tracker[:branch_name]}`" : "pending"} |"
+        patches = tracker[:patches] || []
+        if patches.any?
+          lines << ""
+          lines << "### Patches"
+          lines << ""
+          patches.each_with_index do |patch, idx|
+            file_name = File.basename(patch[:file] || "unknown")
+            lines << "#{idx + 1}. `#{file_name}`"
+          end
+        end
+
         lines << ""
         lines << COMMENT_MARKER
 
@@ -92,7 +103,8 @@ module Adw
           "adw_id" => tracker[:adw_id],
           "classification" => tracker[:classification],
           "branch_name" => tracker[:branch_name],
-          "status" => tracker[:status]
+          "status" => tracker[:status],
+          "patches" => (tracker[:patches] || []).map { |p| p.transform_keys(&:to_s) }
         }
 
         content = "#{YAML.dump(data)}---\n"
@@ -110,10 +122,17 @@ module Adw
           adw_id: data["adw_id"],
           classification: data["classification"],
           branch_name: data["branch_name"],
-          status: data["status"]
+          status: data["status"],
+          patches: (data["patches"] || []).map { |p| p.transform_keys(&:to_sym) }
         }
       rescue Errno::ENOENT, Psych::SyntaxError
         nil
+      end
+
+      def add_patch(tracker, patch_file, comment_id, logger)
+        tracker[:patches] ||= []
+        tracker[:patches] << { file: patch_file, comment_id: comment_id }
+        logger.info("Patch registered in tracker: #{patch_file}")
       end
 
       private

@@ -231,17 +231,7 @@ def main
   logger.info("Plan created at: #{plan_path}")
 
   # Post plan as separate issue comment (source of truth)
-  begin
-    plan_content = File.read(plan_path)
-    plan_comment = format_issue_message(
-      adw_id, AGENT_PLANNER,
-      "Implementation plan\n\n<details>\n<summary>Implementation Plan</summary>\n\n#{plan_content}\n</details>"
-    )
-    Adw::GitHub.create_issue_comment(issue_number, plan_comment)
-    logger.info("Plan posted to issue ##{issue_number}")
-  rescue => e
-    logger.warn("Warning: Could not post plan to issue: #{e.message}")
-  end
+  post_plan_comment(issue_number, adw_id, AGENT_PLANNER, plan_path, "Implementation Plan", logger)
 
   # Implement the plan
   Adw::Tracker.update(tracker, issue_number, "implementing", logger)

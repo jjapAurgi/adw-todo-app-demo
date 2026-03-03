@@ -76,7 +76,7 @@ def find_original_plan(issue_number)
 end
 
 def create_patch_plan(adw_id, change_request, plan_path, issue_number, logger)
-  args = [adw_id, change_request]
+  args = [adw_id, change_request, issue_number]
   args << plan_path unless plan_path.empty?
 
   request = Adw::AgentTemplateRequest.new(
@@ -217,10 +217,6 @@ def main
 
   # Paso 2: Actualizar tracker a patching
   Adw::Tracker.update(tracker, issue_number, "patching", logger)
-  Adw::GitHub.create_issue_comment(
-    issue_number,
-    format_issue_message(adw_id, "patch_ops", "Iniciando ciclo de patch para: #{comment_body[0..200]}")
-  )
 
   # Paso 3: Crear patch plan
   logger.info("\n=== Creando patch plan ===")
@@ -228,10 +224,8 @@ def main
   patch_file, error = create_patch_plan(adw_id, comment_body, plan_path, issue_number, logger)
   check_error(error, issue_number, "Error creando patch plan", logger, tracker)
 
-  Adw::GitHub.create_issue_comment(
-    issue_number,
-    format_issue_message(adw_id, AGENT_PATCHER, "Patch plan creado: `#{patch_file}`")
-  )
+  patch_comment_id = post_plan_comment(issue_number, adw_id, AGENT_PATCHER, patch_file, "Patch Plan", logger)
+  Adw::Tracker.add_patch(tracker, patch_file, patch_comment_id, logger)
 
   # Paso 4: Implementar patch
   logger.info("\n=== Implementando patch ===")
@@ -239,18 +233,9 @@ def main
   implement_response = implement_patch(patch_file, adw_id, logger)
   check_error(implement_response, issue_number, "Error implementando patch", logger, tracker)
 
-  Adw::GitHub.create_issue_comment(
-    issue_number,
-    format_issue_message(adw_id, AGENT_IMPLEMENTOR, "Patch implementado correctamente")
-  )
-
   # Paso 5: Ejecutar tests
   logger.info("\n=== Ejecutando tests ===")
   Adw::Tracker.update(tracker, issue_number, "testing", logger)
-  Adw::GitHub.create_issue_comment(
-    issue_number,
-    format_issue_message(adw_id, AGENT_TESTER, "Ejecutando tests tras patch...")
-  )
 
   results, passed_count, failed_count = run_tests_with_resolution(
     adw_id, issue_number, logger,
@@ -264,18 +249,9 @@ def main
 
   if failed_count > 0
     logger.error("Tests fallidos tras patch: #{failed_count} fallos pendientes")
-    Adw::GitHub.create_issue_comment(
-      issue_number,
-      format_issue_message(adw_id, AGENT_TESTER, "Tests fallidos tras patch: #{failed_count} fallos. Pipeline detenido.")
-    )
     Adw::Tracker.update(tracker, issue_number, "error", logger)
     exit 1
   end
-
-  Adw::GitHub.create_issue_comment(
-    issue_number,
-    format_issue_message(adw_id, AGENT_TESTER, "Todos los tests pasaron correctamente tras patch")
-  )
 
   # Paso 6: Commit y push
   logger.info("\n=== Commit y push ===")
@@ -284,10 +260,6 @@ def main
 
   # Paso 7: Volver a done
   Adw::Tracker.update(tracker, issue_number, "done", logger)
-  Adw::GitHub.create_issue_comment(
-    issue_number,
-    format_issue_message(adw_id, "patch_ops", "Patch completado correctamente para issue ##{issue_number}")
-  )
 
   logger.info("ADW Patch completado correctamente para issue ##{issue_number}")
 end
