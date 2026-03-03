@@ -54,74 +54,29 @@ end
 
 # --- Funciones de testing ---
 
-def format_test_results_comment(results)
-  return "No se encontraron resultados de tests" if results.empty?
-
-  failed_tests = results.reject(&:passed)
-  passed_tests = results.select(&:passed)
-
+def log_test_results(issue_number, adw_id, results, passed_count, failed_count, logger)
   parts = []
 
-  if failed_tests.any?
-    parts << ""
-    parts << "## Tests Fallidos"
-    parts << ""
-    failed_tests.each do |test|
-      parts << "### #{test.test_name}"
-      parts << ""
-      parts << "```json"
-      parts << JSON.pretty_generate(test.to_h)
-      parts << "```"
-      parts << ""
-    end
-  end
-
-  if passed_tests.any?
-    parts << "## Tests Superados"
-    parts << ""
-    passed_tests.each do |test|
-      parts << "### #{test.test_name}"
-      parts << ""
-      parts << "```json"
-      parts << JSON.pretty_generate(test.to_h)
-      parts << "```"
-      parts << ""
-    end
-  end
-
-  parts.pop if parts.last == ""
-  parts.join("\n")
-end
-
-def log_test_results(issue_number, adw_id, results, passed_count, failed_count, logger)
-  summary = "## Resumen de Tests\n\n"
-  summary += "**Total:** #{results.length}\n"
-  summary += "**Pasados:** #{passed_count}\n"
-  summary += "**Fallidos:** #{failed_count}\n\n"
-
-  if results.any?
-    summary += "### Detalle:\n"
-    results.each do |result|
-      status = result.passed ? "PASS" : "FAIL"
-      summary += "- #{status} **#{result.test_name}**\n"
-      summary += "  - Error: #{result.error[0..200]}...\n" if !result.passed && result.error
-    end
-  end
-
   if failed_count > 0
-    summary += "\n### Estado General: FALLIDO\n"
-    summary += "Fallos totales: #{failed_count}\n"
+    parts << "❌ **#{passed_count} passed** | **#{failed_count} failed**"
   else
-    summary += "\n### Estado General: PASADO\n"
-    summary += "Todos los #{results.length} tests pasaron correctamente.\n"
+    parts << "✅ **#{passed_count} passed**"
+  end
+  parts << ""
+
+  results.each do |result|
+    emoji = result.passed ? "✅" : "❌"
+    line = "- #{emoji} #{result.test_name}"
+    line += " — `#{result.error[0..100]}`" if !result.passed && result.error
+    parts << line
   end
 
   Adw::GitHub.create_issue_comment(
     issue_number,
-    format_issue_message(adw_id, "test_summary", summary)
+    format_issue_message(adw_id, "test_summary", parts.join("\n"))
   )
 
-  logger.info("Resumen de resultados de tests publicado en issue ##{issue_number}")
+  logger.info("Test results posted to issue ##{issue_number}")
 end
 
 # --- Funciones de review ---
@@ -142,10 +97,6 @@ def run_review(adw_id, issue_number, issue, tracker, logger)
 
   unless response.success
     logger.error("Error ejecutando review: #{response.output}")
-    Adw::GitHub.create_issue_comment(
-      issue_number,
-      format_issue_message(adw_id, AGENT_REVIEWER, "Error durante la revision: #{response.output}")
-    )
     return { overall_severity: "error", action_required: "none" }
   end
 
@@ -234,26 +185,12 @@ def handle_review_fixes(review_result, adw_id, issue_number, issue, plan_path, l
       model: "sonnet"
     )
 
-    Adw::GitHub.create_issue_comment(
-      issue_number,
-      format_issue_message(adw_id, agent_name, "Intentando corregir problemas de revision (intento #{attempt})...")
-    )
-
     fix_response = Adw::Agent.execute_template(fix_request)
 
     unless fix_response.success
       logger.warn("Review fix intento #{attempt} fallo: #{fix_response.output}")
-      Adw::GitHub.create_issue_comment(
-        issue_number,
-        format_issue_message(adw_id, agent_name, "No se pudieron corregir los problemas: #{fix_response.output}")
-      )
       break
     end
-
-    Adw::GitHub.create_issue_comment(
-      issue_number,
-      format_issue_message(adw_id, agent_name, "Correcciones aplicadas. Re-ejecutando revision...")
-    )
 
     # Re-ejecutar review para verificar correcciones
     logger.info("Re-ejecutando review tras correcciones...")
@@ -302,20 +239,43 @@ def run_documentation(adw_id, issue_number, tracker, logger)
 
   unless response.success
     logger.warn("Warning: Generacion de documentacion fallo: #{response.output}")
-    Adw::GitHub.create_issue_comment(
-      issue_number,
-      format_issue_message(adw_id, AGENT_DOCUMENTER, "Advertencia: No se pudo generar documentacion: #{response.output}")
-    )
     return # No bloqueante: documentacion no para el pipeline
   end
 
   doc_path = response.output.strip
+  logger.info("Documentacion generada: #{doc_path}")
+  post_documentation_summary(issue_number, adw_id, doc_path, logger)
+end
+
+def post_documentation_summary(issue_number, adw_id, doc_path, logger)
+  content = File.read(doc_path)
+
+  parts = []
+  parts << "## Documentation Updated"
+  parts << ""
+  parts << "`#{doc_path}`"
+  parts << ""
+
+  if content =~ /## Overview\s*\n(.*?)(?=\n## )/m
+    parts << "### Overview"
+    parts << ""
+    parts << $1.strip
+    parts << ""
+  end
+
+  if content =~ /## Que se Construyo\s*\n(.*?)(?=\n## )/m
+    parts << "### Changes"
+    parts << ""
+    parts << $1.strip
+  end
+
   Adw::GitHub.create_issue_comment(
     issue_number,
-    format_issue_message(adw_id, AGENT_DOCUMENTER, "Documentacion generada: `#{doc_path}`")
+    format_issue_message(adw_id, AGENT_DOCUMENTER, parts.join("\n"))
   )
-
-  logger.info("Documentacion generada: #{doc_path}")
+  logger.info("Documentation summary posted to issue ##{issue_number}")
+rescue => e
+  logger.warn("Warning: Could not post documentation summary: #{e.message}")
 end
 
 # --- Funciones de commit y PR ---
@@ -401,21 +361,10 @@ def main
   # Paso 2: Fase de testing
   Adw::Tracker.update(tracker, issue_number, "testing", logger)
   logger.info("\n=== Ejecutando suite de tests ===")
-  Adw::GitHub.create_issue_comment(
-    issue_number,
-    format_issue_message(adw_id, AGENT_TESTER, "Ejecutando tests de la aplicacion...")
-  )
 
-  results, passed_count, failed_count = run_tests_with_resolution(adw_id, issue_number, logger)
+  results, passed_count, failed_count = run_tests_with_resolution(adw_id, issue_number, logger, verbose_comments: false)
 
-  # Publicar resultados de tests
-  results_comment = format_test_results_comment(results)
-  Adw::GitHub.create_issue_comment(
-    issue_number,
-    format_issue_message(adw_id, AGENT_TESTER, "Resultados finales de tests:\n#{results_comment}")
-  )
   log_test_results(issue_number, adw_id, results, passed_count, failed_count, logger)
-
   logger.info("Resultados de tests: #{passed_count} pasados, #{failed_count} fallidos")
 
   # Si los tests fallan, parar el pipeline
@@ -434,10 +383,6 @@ def main
   # Si la review tiene hallazgos criticos irresolubles, parar el pipeline
   if review_result[:overall_severity] == "critical" && review_result[:action_required] == "fix_and_rerun"
     logger.error("Review con hallazgos criticos irresolubles")
-    Adw::GitHub.create_issue_comment(
-      issue_number,
-      format_issue_message(adw_id, AGENT_REVIEWER, "Pipeline detenido: hallazgos criticos no resueltos tras #{MAX_REVIEW_FIX_ATTEMPTS} intentos.")
-    )
     Adw::Tracker.update(tracker, issue_number, "error", logger)
     exit 1
   end
