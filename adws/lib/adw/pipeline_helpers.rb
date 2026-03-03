@@ -221,5 +221,93 @@ module Adw
     def bot_comment?(body)
       body =~ BOT_COMMENT_PATTERN
     end
+
+    def link_screenshot_urls(screenshots, review_issues)
+      return unless review_issues&.any?
+
+      url_by_path = screenshots.each_with_object({}) { |s, h| h[s["path"]] = s["url"] if s["url"] }
+      review_issues.each do |item|
+        item["screenshot_url"] = url_by_path[item["screenshot_path"]] if item["screenshot_path"]
+      end
+    end
+
+    def parse_issue_review_results(output, logger)
+      json_text = extract_json_from_markdown(output)
+
+      data = JSON.parse(json_text)
+      {
+        success: data["success"],
+        summary: data["summary"],
+        plan_adherence: data["plan_adherence"],
+        review_issues: data["review_issues"] || [],
+        screenshots: data["screenshots"] || [],
+        errors: data["errors"] || []
+      }
+    rescue JSON::ParserError => e
+      logger.error("Error parseando resultados de review:issue: #{e}")
+      { success: false, summary: "No se pudieron parsear los resultados", plan_adherence: nil,
+        review_issues: [], screenshots: [], errors: ["JSON parse error: #{e.message}"] }
+    end
+
+    def format_evidence_comment(issue_review_result)
+      parts = []
+      parts << "## 📸 Evidencia Visual"
+      parts << ""
+
+      has_urls = issue_review_result[:screenshots]&.any? { |s| s["url"] }
+
+      unless has_urls
+        parts << "> ⚠️ **Las imagenes no se pudieron subir a Cloudflare R2.** Las variables de entorno CLOUDFLARE_* no estan configuradas. Los screenshots se encuentran en el directorio local del agente."
+        parts << ""
+      end
+
+      parts << "**Resumen:** #{issue_review_result[:summary]}"
+
+      if issue_review_result[:plan_adherence]
+        pa = issue_review_result[:plan_adherence]
+        emoji = pa["result"] == "PASS" ? "✅" : "❌"
+        parts << "**Adherencia al plan:** #{emoji} #{pa['result']} - #{pa['details']}"
+      end
+
+      parts << ""
+
+      if issue_review_result[:screenshots]&.any?
+        parts << "### Capturas"
+        parts << ""
+        issue_review_result[:screenshots].each_with_index do |screenshot, idx|
+          if has_urls && screenshot["url"]
+            parts << "#### #{idx + 1}. #{screenshot['description']}"
+            parts << "![#{screenshot['filename']}](#{screenshot['url']})"
+            parts << ""
+          else
+            parts << "#{idx + 1}. **#{screenshot['description']}** → `#{screenshot['path']}`"
+          end
+        end
+      end
+
+      if issue_review_result[:review_issues]&.any?
+        parts << ""
+        parts << "### Problemas encontrados"
+        parts << ""
+        issue_review_result[:review_issues].each do |issue_item|
+          severity_emoji = case issue_item["severity"]
+                           when "blocker" then "🔴"
+                           when "tech_debt" then "🟡"
+                           else "🟢"
+                           end
+          parts << "- #{severity_emoji} **#{issue_item['description']}** (#{issue_item['severity']})"
+          parts << "  - Resolucion: #{issue_item['resolution']}" if issue_item["resolution"]
+          parts << "  - ![evidencia](#{issue_item['screenshot_url']})" if issue_item["screenshot_url"]
+        end
+      end
+
+      if issue_review_result[:errors]&.any?
+        parts << ""
+        parts << "### Errores"
+        issue_review_result[:errors].each { |e| parts << "- #{e}" }
+      end
+
+      parts.join("\n")
+    end
   end
 end

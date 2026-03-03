@@ -9,9 +9,10 @@
 # Ejecuta el pipeline completo encadenando:
 # 1. adw_plan_build - Clasificacion, planificacion e implementacion
 # 2. Fase de testing con resolucion automatica de fallos
-# 3. Fase de review con auto-fix de problemas criticos
-# 4. Fase de documentacion (generacion de docs en app_docs/)
-# 5. Commit y creacion de PR
+# 3. Fase de review tecnica con auto-fix de problemas criticos
+# 4. Fase de review contra la issue con evidencia visual (screenshots + R2)
+# 5. Fase de documentacion (generacion de docs en app_docs/)
+# 6. Commit y creacion de PR
 #
 # Si los tests fallan tras MAX_TEST_RETRY_ATTEMPTS intentos de resolucion,
 # o la review encuentra problemas criticos irresolubles,
@@ -26,7 +27,8 @@ include Adw::PipelineHelpers
 
 # Constantes de agentes
 AGENT_TESTER = "test_runner"
-AGENT_REVIEWER = "code_reviewer"
+AGENT_REVIEWER_TECH = "code_reviewer"
+AGENT_REVIEWER_ISSUE = "issue_reviewer"
 AGENT_DOCUMENTER = "documentation_generator"
 AGENT_PR_CREATOR = "pr_creator"
 
@@ -85,14 +87,14 @@ def run_review(adw_id, issue_number, issue, tracker, logger)
   plan_path = Adw::PipelineHelpers.plan_path_for(issue_number)
 
   request = Adw::AgentTemplateRequest.new(
-    agent_name: AGENT_REVIEWER,
-    slash_command: "/adw:review",
+    agent_name: AGENT_REVIEWER_TECH,
+    slash_command: "/adw:review:tech",
     args: [issue.to_json, plan_path],
     adw_id: adw_id,
     model: "sonnet"
   )
 
-  logger.info("Ejecutando revision de codigo...")
+  logger.info("Ejecutando revision tecnica de codigo...")
   response = Adw::Agent.execute_template(request)
 
   unless response.success
@@ -107,7 +109,7 @@ def run_review(adw_id, issue_number, issue, tracker, logger)
   review_comment = format_review_comment(review_result)
   Adw::GitHub.create_issue_comment(
     issue_number,
-    format_issue_message(adw_id, AGENT_REVIEWER, review_comment)
+    format_issue_message(adw_id, AGENT_REVIEWER_TECH, review_comment)
   )
 
   # Manejar hallazgos criticos con loop de auto-fix
@@ -195,8 +197,8 @@ def handle_review_fixes(review_result, adw_id, issue_number, issue, plan_path, l
     # Re-ejecutar review para verificar correcciones
     logger.info("Re-ejecutando review tras correcciones...")
     recheck_request = Adw::AgentTemplateRequest.new(
-      agent_name: "#{AGENT_REVIEWER}_recheck_#{attempt}",
-      slash_command: "/adw:review",
+      agent_name: "#{AGENT_REVIEWER_TECH}_recheck_#{attempt}",
+      slash_command: "/adw:review:tech",
       args: [issue.to_json, plan_path],
       adw_id: adw_id,
       model: "sonnet"
@@ -210,7 +212,7 @@ def handle_review_fixes(review_result, adw_id, issue_number, issue, plan_path, l
       review_comment = format_review_comment(review_result)
       Adw::GitHub.create_issue_comment(
         issue_number,
-        format_issue_message(adw_id, AGENT_REVIEWER, "Revision post-correccion (intento #{attempt}):\n#{review_comment}")
+        format_issue_message(adw_id, AGENT_REVIEWER_TECH, "Revision post-correccion (intento #{attempt}):\n#{review_comment}")
       )
     else
       logger.warn("Error en re-review: #{recheck_response.output}")
@@ -219,6 +221,63 @@ def handle_review_fixes(review_result, adw_id, issue_number, issue, plan_path, l
   end
 
   review_result
+end
+
+# --- Funciones de review:issue (evidencia visual) ---
+
+def run_issue_review(adw_id, issue_number, issue, tracker, logger)
+  plan_path = Adw::PipelineHelpers.plan_path_for(issue_number)
+
+  request = Adw::AgentTemplateRequest.new(
+    agent_name: AGENT_REVIEWER_ISSUE,
+    slash_command: "/adw:review:issue",
+    args: [issue.to_json, plan_path],
+    adw_id: adw_id,
+    model: "sonnet"
+  )
+
+  logger.info("Ejecutando revision contra la issue...")
+  response = Adw::Agent.execute_template(request)
+
+  unless response.success
+    logger.warn("Warning: Revision de issue fallo: #{response.output}")
+    Adw::GitHub.create_issue_comment(
+      issue_number,
+      format_issue_message(adw_id, AGENT_REVIEWER_ISSUE,
+        "Advertencia: No se pudo completar la revision visual: #{response.output}")
+    )
+    return nil
+  end
+
+  # Parsear resultados
+  result = parse_issue_review_results(response.output, logger)
+
+  unless result[:success] && result[:screenshots]&.any?
+    logger.warn("No se obtuvieron screenshots")
+    return result
+  end
+
+  # Subir screenshots a R2
+  begin
+    result[:screenshots] = Adw::R2.upload_evidence(
+      adw_id, result[:screenshots], logger
+    )
+    link_screenshot_urls(result[:screenshots], result[:review_issues])
+  rescue Aws::S3::Errors::ServiceError, Errno::ENOENT => e
+    logger.warn("Error subiendo screenshots a R2: #{e.message}")
+    result[:errors] ||= []
+    result[:errors] << "R2 upload failed: #{e.message}"
+  end
+
+  # Publicar comentario de evidencia
+  evidence_comment = format_evidence_comment(result)
+  Adw::GitHub.create_issue_comment(
+    issue_number,
+    format_issue_message(adw_id, AGENT_REVIEWER_ISSUE, evidence_comment)
+  )
+
+  logger.info("Evidencia visual publicada en issue ##{issue_number}")
+  result
 end
 
 # --- Funciones de documentacion ---
@@ -387,21 +446,27 @@ def main
     exit 1
   end
 
-  logger.info("Review completada: severidad #{review_result[:overall_severity]}")
+  logger.info("Review tecnica completada: severidad #{review_result[:overall_severity]}")
 
-  # Paso 4: Fase de documentacion
+  # Paso 4: Review contra issue + evidencia visual
+  Adw::Tracker.update(tracker, issue_number, "reviewing_issue", logger)
+  logger.info("\n=== Ejecutando revision contra la issue ===")
+
+  run_issue_review(adw_id, issue_number, issue, tracker, logger)
+
+  # Paso 5: Fase de documentacion
   Adw::Tracker.update(tracker, issue_number, "documenting", logger)
   logger.info("\n=== Ejecutando generacion de documentacion ===")
 
   run_documentation(adw_id, issue_number, tracker, logger)
 
-  # Paso 5: Commit de todos los cambios
+  # Paso 6: Commit de todos los cambios
   Adw::Tracker.update(tracker, issue_number, "committing", logger)
   logger.info("\n=== Commiteando cambios ===")
 
   commit_all_changes(issue, tracker, adw_id, issue_number, logger)
 
-  # Paso 6: Crear pull request
+  # Paso 7: Crear pull request
   Adw::Tracker.update(tracker, issue_number, "creating_pr", logger)
   logger.info("\n=== Creando pull request ===")
 

@@ -1,5 +1,5 @@
 ---
-description: Revisa los cambios implementados verificando calidad, adherencia al plan y posibles problemas
+description: Revisa los cambios implementados verificando calidad tecnica y posibles problemas
 allowed-tools:
   - Bash
   - Read
@@ -7,9 +7,9 @@ allowed-tools:
   - Grep
 ---
 
-# Revision de Codigo
+# Revision Tecnica de Codigo
 
-Revisa los cambios realizados en la rama actual comparandolos con la rama main, evaluando calidad de codigo, adherencia al plan y posibles problemas.
+Revisa los cambios realizados en la rama actual comparandolos con la rama main, evaluando calidad de codigo y posibles problemas tecnicos.
 
 ## Variables
 
@@ -42,12 +42,11 @@ PLAN_PATH: $2 - Ruta al fichero del plan de implementacion
 ### Paso 3: Evaluar criterios de revision
 Evalua cada uno de los siguientes criterios:
 
-1. **plan_adherence**: Los cambios implementan lo que el plan especifica. No hay funcionalidad faltante ni extra no planificada.
-2. **code_quality**: El codigo sigue las convenciones del proyecto, es legible, y no tiene code smells evidentes (duplicacion excesiva, funciones demasiado largas, nombres poco descriptivos).
-3. **unintended_changes**: No hay cambios en ficheros no relacionados con la issue. No hay ficheros de configuracion, dependencias o assets modificados sin justificacion.
-4. **security**: No hay credenciales hardcodeadas, inyecciones SQL, XSS, o exposicion de datos sensibles en los cambios.
-5. **error_handling**: Los cambios incluyen manejo de errores adecuado donde es necesario (validaciones, try/catch, respuestas de error).
-6. **naming_conventions**: Nombres de variables, funciones, clases y ficheros siguen las convenciones del lenguaje y del proyecto.
+1. **code_quality**: El codigo sigue las convenciones del proyecto, es legible, y no tiene code smells evidentes (duplicacion excesiva, funciones demasiado largas, nombres poco descriptivos).
+2. **unintended_changes**: No hay cambios en ficheros no relacionados con la issue. No hay ficheros de configuracion, dependencias o assets modificados sin justificacion.
+3. **security**: No hay credenciales hardcodeadas, inyecciones SQL, XSS, o exposicion de datos sensibles en los cambios.
+4. **error_handling**: Los cambios incluyen manejo de errores adecuado donde es necesario (validaciones, try/catch, respuestas de error).
+5. **naming_conventions**: Nombres de variables, funciones, clases y ficheros siguen las convenciones del lenguaje y del proyecto.
 
 ## Reporte
 
@@ -77,14 +76,8 @@ Evalua cada uno de los siguientes criterios:
 ```json
 {
   "overall_severity": "warning",
-  "summary": "La implementacion sigue el plan correctamente. Se encontraron 2 hallazgos menores en naming conventions.",
+  "summary": "La implementacion es de buena calidad tecnica. Se encontraron 2 hallazgos menores en naming conventions.",
   "checks": [
-    {
-      "name": "plan_adherence",
-      "result": "PASS",
-      "severity": "info",
-      "details": "Todos los requisitos del plan estan implementados."
-    },
     {
       "name": "code_quality",
       "result": "PASS",

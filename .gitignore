@@ -18,3 +18,5 @@ adws/log/
 
 # GitHub CLI auth (Docker)
 .gh/
+
+.env
