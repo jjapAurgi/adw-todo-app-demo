@@ -20,3 +20,4 @@ adws/log/
 .gh/
 
 .env
+node_modules
