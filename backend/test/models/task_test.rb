@@ -4,14 +4,11 @@
 #
 #  id         :bigint           not null, primary key
 #  completed  :boolean          default(FALSE), not null
-#  position   :integer          default(0), not null
+#  due_date   :date
+#  position   :integer          not null
 #  title      :string           not null
 #  created_at :datetime         not null
 #  updated_at :datetime         not null
-#
-# Indexes
-#
-#  index_tasks_on_position  (position)
 #
 require "test_helper"
 
@@ -59,5 +56,22 @@ class TaskTest < ActiveSupport::TestCase
     tasks = Task.all
     positions = tasks.map(&:position)
     assert_equal positions.sort, positions
+  end
+
+  test "valid task with due_date nil" do
+    task = Task.new(title: "Task without due date")
+    assert task.valid?
+    assert_nil task.due_date
+  end
+
+  test "valid task with future due_date" do
+    task = Task.new(title: "Task with future date", due_date: 7.days.from_now.to_date)
+    assert task.valid?
+  end
+
+  test "invalid task with past due_date on create" do
+    task = Task.new(title: "Task with past date", due_date: 1.day.ago.to_date)
+    assert_not task.valid?
+    assert_includes task.errors[:due_date], "must be greater than or equal to #{Date.today}"
   end
 end

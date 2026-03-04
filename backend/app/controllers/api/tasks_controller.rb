@@ -56,7 +56,7 @@ class Api::TasksController < ApplicationController
   private
 
   def task_params
-    params.require(:task).permit(:title, :completed, :position)
+    params.require(:task).permit(:title, :completed, :position, :due_date)
   end
 
   def record_not_found

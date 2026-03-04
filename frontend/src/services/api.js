@@ -8,11 +8,13 @@ export async function fetchTasks() {
 }
 
 // POST /api/tasks - Crear nueva tarea
-export async function createTask(title) {
+export async function createTask(title, dueDate) {
+  const task = { title }
+  if (dueDate) task.due_date = dueDate
   const response = await fetch(`${API_BASE_URL}/tasks`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ task: { title } })
+    body: JSON.stringify({ task })
   })
   if (!response.ok) throw new Error('Failed to create task')
   return response.json()

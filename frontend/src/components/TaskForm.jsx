@@ -2,12 +2,14 @@ import { useState } from 'react'
 
 function TaskForm({ onTaskCreated }) {
   const [title, setTitle] = useState('')
+  const [dueDate, setDueDate] = useState('')
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (title.trim()) {
-      await onTaskCreated(title)
+      await onTaskCreated(title, dueDate || null)
       setTitle('')
+      setDueDate('')
     }
   }
 
@@ -19,6 +21,12 @@ function TaskForm({ onTaskCreated }) {
         onChange={(e) => setTitle(e.target.value)}
         placeholder="Nueva tarea..."
         className="task-input"
+      />
+      <input
+        type="date"
+        value={dueDate}
+        onChange={(e) => setDueDate(e.target.value)}
+        className="task-date-input"
       />
       <button type="submit" className="btn btn-primary">
         Añadir
