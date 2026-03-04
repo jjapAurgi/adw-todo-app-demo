@@ -33,6 +33,7 @@ CHORE: El resto de $ARGUMENTS (excluyendo RUTA_PLAN si fue proporcionado como pr
 
 ### Paso 2: Investigar
 - Investiga el codebase y elabora un plan para completar CHORE.
+- Lee `app_docs/conditional_docs.md` para comprobar si tu tarea requiere documentacion adicional.
 
 ### Paso 3: Crear el plan
 - Crea el plan en RUTA_PLAN (creando directorios intermedios si es necesario con `mkdir -p`).
@@ -50,6 +51,8 @@ CHORE: El resto de $ARGUMENTS (excluyendo RUTA_PLAN si fue proporcionado como pr
 Usa estos ficheros para resolver el chore:
 
 <encuentra y lista los ficheros relevantes para el chore y describe por qué son relevantes en viñetas. Si hay ficheros nuevos que necesitan crearse para completar el chore, lístalos en una sección h3 'Ficheros Nuevos'.>
+
+- Lee `app_docs/conditional_docs.md` para comprobar si tu tarea requiere documentacion adicional. Si tu tarea coincide con alguna de las condiciones listadas, incluye esos ficheros de documentacion en esta seccion.
 
 ## Tareas Paso a Paso
 IMPORTANTE: Ejecuta cada paso en orden, de arriba a abajo.

@@ -42,6 +42,8 @@ Centrate en los siguientes ficheros:
 - `frontend/src/**` - Contiene el codigo del cliente React.
 - `plans/` - Contiene planes existentes para referencia.
 
+- Lee `app_docs/conditional_docs.md` para comprobar si tu tarea requiere documentacion adicional. Si tu tarea coincide con alguna de las condiciones listadas, referencia esos ficheros de documentacion para entender mejor el contexto al crear tu patch plan.
+
 ## Formato del Plan
 
 ```md
