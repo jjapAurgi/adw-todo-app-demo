@@ -16,8 +16,8 @@ function App() {
     setTasks(data)
   }
 
-  const handleCreateTask = async (title) => {
-    const newTask = await createTask(title)
+  const handleCreateTask = async (title, dueDate) => {
+    const newTask = await createTask(title, dueDate)
     setTasks([...tasks, newTask])
   }
 

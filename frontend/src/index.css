@@ -148,3 +148,33 @@ p {
   text-decoration: line-through;
   color: #999;
 }
+
+/* Date Input */
+.task-date-input {
+  padding: 0.5rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 0.875rem;
+}
+
+.task-date-input:focus {
+  outline: none;
+  border-color: #3498db;
+}
+
+/* Due Date Indicator */
+.due-date {
+  font-size: 0.8rem;
+  color: #999;
+  white-space: nowrap;
+}
+
+.due-date--overdue {
+  color: #e74c3c;
+  font-weight: 600;
+}
+
+.due-date--soon {
+  color: #f39c12;
+  font-weight: 600;
+}

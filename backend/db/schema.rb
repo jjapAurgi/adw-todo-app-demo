@@ -10,13 +10,14 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_02_24_175121) do
+ActiveRecord::Schema[8.1].define(version: 2026_03_04_144557) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
   create_table "tasks", force: :cascade do |t|
     t.boolean "completed", default: false, null: false
     t.datetime "created_at", null: false
+    t.date "due_date"
     t.integer "position", default: 0, null: false
     t.string "title", null: false
     t.datetime "updated_at", null: false

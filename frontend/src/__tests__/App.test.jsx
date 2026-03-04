@@ -1,6 +1,6 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import App from '../App'
-import { fetchTasks, updateTask } from '../services/api'
+import { fetchTasks, createTask, updateTask } from '../services/api'
 
 // Mock del servicio API
 vi.mock('../services/api', () => ({
@@ -48,5 +48,23 @@ test('toggle calls updateTask with completed: false when task is completed', asy
 
   await waitFor(() => {
     expect(updateTask).toHaveBeenCalledWith(1, { completed: false })
+  })
+})
+
+test('create task with due date calls createTask with title and date', async () => {
+  fetchTasks.mockResolvedValue([])
+  createTask.mockResolvedValue({ id: 2, title: 'Dated task', completed: false, due_date: '2026-12-31' })
+
+  render(<App />)
+
+  const titleInput = screen.getByPlaceholderText(/nueva tarea/i)
+  const dateInput = document.querySelector('input[type="date"]')
+
+  fireEvent.change(titleInput, { target: { value: 'Dated task' } })
+  fireEvent.change(dateInput, { target: { value: '2026-12-31' } })
+  fireEvent.submit(screen.getByRole('button', { name: /añadir/i }))
+
+  await waitFor(() => {
+    expect(createTask).toHaveBeenCalledWith('Dated task', '2026-12-31')
   })
 })

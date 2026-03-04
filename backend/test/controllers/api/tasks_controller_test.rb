@@ -149,4 +149,52 @@ class Api::TasksControllerTest < ActionDispatch::IntegrationTest
     positions = json_response.map { |t| t["position"] }
     assert_equal positions.sort, positions
   end
+
+  # Tests de due_date
+  test "should create task with due_date" do
+    future_date = 5.days.from_now.to_date.to_s
+
+    assert_difference("Task.count", 1) do
+      post api_tasks_url, params: { task: { title: "Task with date", due_date: future_date } }, as: :json
+    end
+
+    assert_response :created
+    json_response = JSON.parse(response.body)
+    assert_equal future_date, json_response["due_date"]
+  end
+
+  test "should create task without due_date" do
+    assert_difference("Task.count", 1) do
+      post api_tasks_url, params: { task: { title: "Task without date" } }, as: :json
+    end
+
+    assert_response :created
+    json_response = JSON.parse(response.body)
+    assert_nil json_response["due_date"]
+  end
+
+  test "should update due_date of existing task" do
+    task = tasks(:one)
+    new_date = 10.days.from_now.to_date.to_s
+
+    patch api_task_url(task), params: { task: { due_date: new_date } }, as: :json
+
+    assert_response :success
+    json_response = JSON.parse(response.body)
+    assert_equal new_date, json_response["due_date"]
+
+    task.reload
+    assert_equal new_date, task.due_date.to_s
+  end
+
+  test "should remove due_date by setting to null" do
+    task = tasks(:one)
+    assert_not_nil task.due_date
+
+    patch api_task_url(task), params: { task: { due_date: nil } }, as: :json
+
+    assert_response :success
+    task.reload
+    assert_nil task.due_date
+  end
 end
