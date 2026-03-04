@@ -11,6 +11,7 @@ module Adw
       output :tracker
 
       def call
+        log_actor("Pushing branch to origin")
         branch_name = tracker[:branch_name]
         unless branch_name
           fail!(error: "No branch_name in tracker, cannot push")

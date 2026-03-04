@@ -12,6 +12,7 @@ module Adw
       output :pr_url
 
       def call
+        log_actor("Creating pull request (agent: #{agent_name})")
         Adw::Tracker.update(tracker, issue_number, "creating_pr", logger)
         branch_name = tracker[:branch_name]
 

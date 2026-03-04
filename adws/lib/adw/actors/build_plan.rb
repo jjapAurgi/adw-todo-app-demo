@@ -10,6 +10,7 @@ module Adw
       output :plan_path
 
       def call
+        log_actor("Building plan (agent: sdlc_planner)")
         path = Adw::PipelineHelpers.plan_path_for(issue_number)
         Adw::Tracker.update(tracker, issue_number, "planning", logger)
 

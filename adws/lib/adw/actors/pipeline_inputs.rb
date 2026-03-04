@@ -10,6 +10,11 @@ module Adw
         base.input :adw_id
         base.input :logger
       end
+
+      def log_actor(msg = "Starting")
+        actor_name = self.class.name.split("::").last
+        logger.info("[#{actor_name}] #{msg}")
+      end
     end
   end
 end

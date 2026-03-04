@@ -11,6 +11,7 @@ module Adw
       output :documentation_skipped, default: -> { false }
 
       def call
+        log_actor("Generating documentation (agent: #{agent_name})")
         Adw::Tracker.update(tracker, issue_number, "documenting", logger)
         plan_path = Adw::PipelineHelpers.plan_path_for(issue_number)
 

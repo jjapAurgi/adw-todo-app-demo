@@ -6,6 +6,7 @@ module Adw
       output :tracker
 
       def call
+        log_actor("Initializing tracker")
         loaded = Adw::Tracker.load(issue_number) || {}
         self.tracker = loaded.merge(adw_id: adw_id)
       end

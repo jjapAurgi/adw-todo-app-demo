@@ -9,6 +9,7 @@ module Adw
       output :tracker
 
       def call
+        log_actor("Marking workflow as done")
         Adw::Tracker.update(tracker, issue_number, "done", logger)
         logger.info("Workflow marked as done for issue ##{issue_number}")
       end

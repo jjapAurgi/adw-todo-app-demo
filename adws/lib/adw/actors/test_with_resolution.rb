@@ -11,6 +11,7 @@ module Adw
       input :ops_agent_name,   default: -> { "ops" }
       input :verbose_comments, default: -> { false }
 
+      output :tracker
       output :test_results   # Array<Adw::TestResult>
       output :passed_count   # Integer
       output :failed_count   # Integer
@@ -18,6 +19,8 @@ module Adw
       MAX_ATTEMPTS = Adw::PipelineHelpers::MAX_TEST_RETRY_ATTEMPTS
 
       def call
+        log_actor("Running tests (agent: #{test_agent_name})")
+        Adw::Tracker.update(tracker, issue_number, "testing", logger)
         attempt = 0
         results = []
         passed = 0
@@ -67,6 +70,7 @@ module Adw
           post_comment("Max retries (#{MAX_ATTEMPTS}) reached with #{failed} failures") if verbose_comments
         end
 
+        self.tracker = tracker
         self.test_results = results
         self.passed_count = passed
         self.failed_count = failed

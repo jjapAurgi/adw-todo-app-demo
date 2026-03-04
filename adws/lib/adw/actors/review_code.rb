@@ -14,6 +14,7 @@ module Adw
       output :review_result
 
       def call
+        log_actor("Reviewing code (agent: #{agent_name})")
         Adw::Tracker.update(tracker, issue_number, "reviewing", logger)
 
         plan_path = Adw::PipelineHelpers.plan_path_for(issue_number)

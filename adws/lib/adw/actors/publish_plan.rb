@@ -10,6 +10,7 @@ module Adw
       output :tracker
 
       def call
+        log_actor("Publishing plan to GitHub")
         content = File.read(plan_path)
         body = Adw::PipelineHelpers.format_issue_message(
           adw_id, agent_name,

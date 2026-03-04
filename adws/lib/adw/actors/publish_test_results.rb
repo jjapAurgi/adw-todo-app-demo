@@ -12,6 +12,7 @@ module Adw
       output :tracker
 
       def call
+        log_actor("Publishing test results")
         parts = []
         if failed_count > 0
           parts << "❌ **#{passed_count} passed** | **#{failed_count} failed**"

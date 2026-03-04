@@ -9,6 +9,7 @@ module Adw
       output :tracker
 
       def call
+        log_actor("Implementing plan (agent: #{agent_name})")
         Adw::Tracker.update(tracker, issue_number, "implementing", logger)
 
         request = Adw::AgentTemplateRequest.new(

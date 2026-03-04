@@ -9,6 +9,7 @@ module Adw
       output :issue_command
 
       def call
+        log_actor("Classifying issue (agent: issue_classifier)")
         Adw::Tracker.update(tracker, issue_number, "classifying", logger)
 
         request = Adw::AgentTemplateRequest.new(

@@ -13,6 +13,7 @@ module Adw
       output :tracker
 
       def call
+        log_actor("Committing changes (agent: #{agent_name})")
         Adw::Tracker.update(tracker, issue_number, "committing", logger)
 
         stdout, _, status = Open3.capture3("git", "status", "--porcelain")

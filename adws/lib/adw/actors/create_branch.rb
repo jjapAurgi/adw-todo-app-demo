@@ -10,6 +10,7 @@ module Adw
       output :branch_name
 
       def call
+        log_actor("Creating branch (agent: branch_generator)")
         issue_type = issue_command.delete_prefix("/")
 
         request = Adw::AgentTemplateRequest.new(
