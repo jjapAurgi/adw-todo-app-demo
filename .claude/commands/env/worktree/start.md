@@ -7,18 +7,24 @@ allowed-tools: Bash
 
 ## Variables
 
-WORKTREE_PATH: $1 — Ruta absoluta al worktree
+WORKTREE_PATH:         $1 — Ruta absoluta al worktree
+COMPOSE_PROJECT_NAME:  $2 — Nombre del proyecto Docker Compose
+POSTGRES_PORT:         $3 — Puerto de PostgreSQL
+DATABASE_URL:          $4 — URL de conexión a la base de datos
+PORT:                  $5 — Puerto del backend
+VITE_PORT:             $6 — Puerto del frontend
 
 ## Instrucciones
 
-- Leer `.env.local` antes de ejecutar cualquier comando para tener los puertos correctos
-- La infra usa `COMPOSE_PROJECT_NAME` + `POSTGRES_PORT` del `.env.local`
+- Las variables de entorno vienen como argumentos — no es necesario leer `.env.local`
+- La infra usa `COMPOSE_PROJECT_NAME` + `POSTGRES_PORT` de los argumentos recibidos
 - Usar `run_in_background: true` para backend y frontend
 - Si un puerto ya está en uso, informar pero no fallar
 
 ## Workflow
 
-1. Leer y exportar todas las variables de `{WORKTREE_PATH}/.env.local`
+1. Usar las variables recibidas como argumentos:
+   COMPOSE_PROJECT_NAME=$2, POSTGRES_PORT=$3, DATABASE_URL=$4, PORT=$5, VITE_PORT=$6
 
 2. Arrancar infra aislada desde `{WORKTREE_PATH}/backend/`:
    `COMPOSE_PROJECT_NAME=$COMPOSE_PROJECT_NAME POSTGRES_PORT=$POSTGRES_PORT docker compose up -d`
