@@ -15,6 +15,7 @@ module Adw
 
       play Adw::Actors::CreateWorktree,
            Adw::Actors::ConfigureWorktree,
+           Adw::Actors::InstallWorktreeDeps,
            Adw::Actors::StartWorktreeEnv
     end
   end
