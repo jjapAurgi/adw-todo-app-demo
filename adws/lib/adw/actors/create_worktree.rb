@@ -19,6 +19,7 @@ module Adw
 
       def call
         log_actor("Generating branch name and creating worktree")
+        Adw::Tracker.update(tracker, issue_number, "creating_worktree", logger)
 
         issue_type = issue_command.delete_prefix("/")
 

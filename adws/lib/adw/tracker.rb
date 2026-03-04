@@ -7,6 +7,7 @@ module Adw
   module Tracker
     STATUS_EMOJIS = {
       "classifying" => "🏷️",
+      "creating_worktree" => "🌿",
       "setting_up" => "🌲",
       "planning" => "📋",
       "implementing" => "🔨",
@@ -26,8 +27,9 @@ module Adw
     COMMENT_MARKER = "<!-- adw_tracker:v1 -->"
 
     LABEL_COLORS = {
-      "adw/classifying"  => "C2E0C6",
-      "adw/setting_up"   => "C3E6CB",
+      "adw/classifying"        => "C2E0C6",
+      "adw/creating_worktree"  => "B2DFDB",
+      "adw/setting_up"         => "C3E6CB",
       "adw/planning"     => "BFD4F2",
       "adw/implementing" => "FEF2C0",
       "adw/testing"      => "D4E157",
