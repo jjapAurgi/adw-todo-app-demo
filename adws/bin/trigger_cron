@@ -22,6 +22,8 @@ require_relative "../lib/adw"
 module Adw
   module Pipelines
     class TriggerCron
+      RESET = "\e[0m"
+
       attr_reader :repo_path, :processed_issues, :issue_last_comment
       attr_accessor :shutdown_requested
 
@@ -30,6 +32,79 @@ module Adw
         @processed_issues = Set.new
         @issue_last_comment = {}
         @shutdown_requested = false
+        @stdout_mutex = Mutex.new
+      end
+
+      def hsl_to_rgb(h, s, l)
+        c = (1 - (2 * l - 1).abs) * s
+        x = c * (1 - ((h / 60.0) % 2 - 1).abs)
+        m = l - c / 2.0
+        r1, g1, b1 = case (h / 60).to_i
+                     when 0 then [c, x, 0]
+                     when 1 then [x, c, 0]
+                     when 2 then [0, c, x]
+                     when 3 then [0, x, c]
+                     when 4 then [x, 0, c]
+                     else        [c, 0, x]
+                     end
+        [((r1 + m) * 255).round, ((g1 + m) * 255).round, ((b1 + m) * 255).round]
+      end
+
+      def color_for(issue_number)
+        return "" unless $stdout.tty?
+        hue = (issue_number.to_i * 137.508) % 360
+        r, g, b = hsl_to_rgb(hue, 0.85, 0.55)
+        "\e[38;2;#{r};#{g};#{b}m"
+      end
+
+      def reset_seq
+        $stdout.tty? ? RESET : ""
+      end
+
+      def clog(issue_number, msg)
+        @stdout_mutex.synchronize do
+          $stdout.puts "#{color_for(issue_number)}#{msg}#{reset_seq}"
+          $stdout.flush
+        end
+      end
+
+      def cwarn(issue_number, msg)
+        @stdout_mutex.synchronize do
+          $stderr.puts "#{color_for(issue_number)}#{msg}#{reset_seq}"
+          $stderr.flush
+        end
+      end
+
+      def glog(msg)
+        @stdout_mutex.synchronize do
+          $stdout.puts msg
+          $stdout.flush
+        end
+      end
+
+      def spawn_with_color(issue_number, *cmd)
+        color = color_for(issue_number)
+        rst   = reset_seq
+        read_io, write_io = IO.pipe
+
+        pid = Process.spawn(*cmd, out: write_io, err: write_io)
+        write_io.close
+        Process.detach(pid)
+
+        Thread.new do
+          begin
+            read_io.each_line do |line|
+              @stdout_mutex.synchronize do
+                $stdout.print "#{color}#{line}#{rst}"
+                $stdout.flush
+              end
+            end
+          ensure
+            read_io.close
+          end
+        end
+
+        pid
       end
 
       def should_process_issue?(issue_number)
@@ -37,7 +112,7 @@ module Adw
 
         # If no comments, it's a new issue - process it
         if comments.empty?
-          puts "INFO: Issue ##{issue_number} has no comments - marking for processing"
+          clog(issue_number, "INFO: Issue ##{issue_number} has no comments - marking for processing")
           return true
         end
 
@@ -52,7 +127,7 @@ module Adw
 
         # Check if latest comment is exactly 'adw'
         if comment_body == "adw"
-          puts "INFO: Issue ##{issue_number} - latest comment is 'adw' - marking for processing"
+          clog(issue_number, "INFO: Issue ##{issue_number} - latest comment is 'adw' - marking for processing")
           issue_last_comment[issue_number] = comment_id
           return true
         end
@@ -78,7 +153,7 @@ module Adw
         return nil if comment_body.include?(Adw::Tracker::COMMENT_MARKER)
 
         # New human comment on a done issue → trigger patch
-        puts "INFO: Issue ##{issue_number} (adw/done) - new human comment detected"
+        clog(issue_number, "INFO: Issue ##{issue_number} (adw/done) - new human comment detected")
         issue_last_comment[issue_number] = comment_id
 
         # Return the human comment body directly (avoids a second API call)
@@ -88,34 +163,32 @@ module Adw
       def trigger_patch_workflow(issue_number, comment_body)
         script_path = File.join(__dir__, "adw_patch")
 
-        puts "INFO: Triggering ADW patch workflow for issue ##{issue_number}"
+        clog(issue_number, "INFO: Triggering ADW patch workflow for issue ##{issue_number}")
 
-        pid = Process.spawn(
-          RbConfig.ruby, script_path, issue_number.to_s, comment_body,
-          out: $stdout,
-          err: $stderr
-        )
-        Process.detach(pid)
+        pid = spawn_with_color(issue_number, RbConfig.ruby, script_path, issue_number.to_s, comment_body)
 
-        puts "INFO: Successfully triggered patch workflow for issue ##{issue_number} (PID: #{pid})"
+        clog(issue_number, "INFO: Successfully triggered patch workflow for issue ##{issue_number} (PID: #{pid})")
         true
       rescue => e
-        warn "ERROR: Exception while triggering patch workflow for issue ##{issue_number}: #{e}"
+        cwarn(issue_number, "ERROR: Exception while triggering patch workflow for issue ##{issue_number}: #{e}")
         false
       end
 
-      def trigger_worktree_teardown(branch_name)
+      def trigger_worktree_teardown(branch_name, issue_num = nil)
         script_path = File.join(__dir__, "adw_teardown_worktree")
-        puts "INFO: Triggering worktree teardown for branch: #{branch_name}"
-        pid = Process.spawn(
-          RbConfig.ruby, script_path, branch_name,
-          out: $stdout, err: $stderr
-        )
-        Process.detach(pid)
-        puts "INFO: Teardown spawned for #{branch_name} (PID: #{pid})"
+        log_num = issue_num || 0
+        clog(log_num, "INFO: Triggering worktree teardown for branch: #{branch_name}")
+        pid = if issue_num
+          spawn_with_color(issue_num, RbConfig.ruby, script_path, branch_name)
+        else
+          p = Process.spawn(RbConfig.ruby, script_path, branch_name, out: $stdout, err: $stderr)
+          Process.detach(p)
+          p
+        end
+        clog(log_num, "INFO: Teardown spawned for #{branch_name} (PID: #{pid})")
         true
       rescue => e
-        warn "ERROR: Exception triggering teardown for #{branch_name}: #{e}"
+        cwarn(log_num, "ERROR: Exception triggering teardown for #{branch_name}: #{e}")
         false
       end
 
@@ -132,27 +205,22 @@ module Adw
           next if issue_num == 0
           next if open_issue_numbers.include?(issue_num)
 
-          puts "INFO: Issue ##{issue_num} closed — removing worktree: #{branch_name}"
-          trigger_worktree_teardown(branch_name)
+          clog(issue_num, "INFO: Issue ##{issue_num} closed — removing worktree: #{branch_name}")
+          trigger_worktree_teardown(branch_name, issue_num)
         end
       end
 
       def trigger_workflow(issue_number)
         script_path = File.join(__dir__, "adw_full_pipeline")
 
-        puts "INFO: Triggering ADW workflow for issue ##{issue_number}"
+        clog(issue_number, "INFO: Triggering ADW workflow for issue ##{issue_number}")
 
-        pid = Process.spawn(
-          RbConfig.ruby, script_path, issue_number.to_s,
-          out: $stdout,
-          err: $stderr
-        )
-        Process.detach(pid)
+        pid = spawn_with_color(issue_number, RbConfig.ruby, script_path, issue_number.to_s)
 
-        puts "INFO: Successfully triggered workflow for issue ##{issue_number} (PID: #{pid})"
+        clog(issue_number, "INFO: Successfully triggered workflow for issue ##{issue_number} (PID: #{pid})")
         true
       rescue => e
-        warn "ERROR: Exception while triggering workflow for issue ##{issue_number}: #{e}"
+        cwarn(issue_number, "ERROR: Exception while triggering workflow for issue ##{issue_number}: #{e}")
         false
       end
 
@@ -160,14 +228,14 @@ module Adw
         return if shutdown_requested
 
         start_time = Time.now
-        puts "INFO: Starting issue check cycle"
+        glog("INFO: Starting issue check cycle")
 
         begin
           # Fetch all open issues
           issues = Adw::GitHub.fetch_open_issues(repo_path)
 
           if issues.empty?
-            puts "INFO: No open issues found"
+            glog("INFO: No open issues found")
             return
           end
 
@@ -200,7 +268,7 @@ module Adw
             if adw_labels.any?
               non_error_labels = adw_labels.reject { |l| l.name == "adw/error" }
               if non_error_labels.any?
-                puts "INFO: Skipping issue ##{issue_number} - ADW active (#{non_error_labels.map(&:name).join(', ')})"
+                clog(issue_number, "INFO: Skipping issue ##{issue_number} - ADW active (#{non_error_labels.map(&:name).join(', ')})")
                 next
               end
             end
@@ -213,20 +281,20 @@ module Adw
 
           # Process patch issues
           if patch_comments.any?
-            puts "INFO: Found #{patch_comments.length} issues needing patch: #{patch_comments.keys}"
+            glog("INFO: Found #{patch_comments.length} issues needing patch: #{patch_comments.keys}")
 
             patch_comments.each do |issue_number, comment_body|
               break if shutdown_requested
 
               unless trigger_patch_workflow(issue_number, comment_body)
-                puts "WARNING: Failed to trigger patch for issue ##{issue_number}, will retry in next cycle"
+                clog(issue_number, "WARNING: Failed to trigger patch for issue ##{issue_number}, will retry in next cycle")
               end
             end
           end
 
           # Process full pipeline issues
           if new_qualifying_issues.any?
-            puts "INFO: Found #{new_qualifying_issues.length} new qualifying issues: #{new_qualifying_issues}"
+            glog("INFO: Found #{new_qualifying_issues.length} new qualifying issues: #{new_qualifying_issues}")
 
             new_qualifying_issues.each do |issue_number|
               break if shutdown_requested
@@ -234,20 +302,20 @@ module Adw
               if trigger_workflow(issue_number)
                 processed_issues.add(issue_number)
               else
-                puts "WARNING: Failed to process issue ##{issue_number}, will retry in next cycle"
+                clog(issue_number, "WARNING: Failed to process issue ##{issue_number}, will retry in next cycle")
               end
             end
           end
 
           if new_qualifying_issues.empty? && patch_comments.empty?
-            puts "INFO: No new qualifying issues found"
+            glog("INFO: No new qualifying issues found")
           end
 
           cleanup_stale_worktrees(issues.map(&:number).to_set)
 
           cycle_time = Time.now - start_time
-          puts "INFO: Check cycle completed in #{cycle_time.round(2)} seconds"
-          puts "INFO: Total processed issues in session: #{processed_issues.length}"
+          glog("INFO: Check cycle completed in #{cycle_time.round(2)} seconds")
+          glog("INFO: Total processed issues in session: #{processed_issues.length}")
         rescue => e
           warn "ERROR: Error during check cycle: #{e}"
           warn e.backtrace.join("\n")
