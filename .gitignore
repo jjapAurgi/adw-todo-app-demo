@@ -15,6 +15,7 @@
 
 # ADW execution logs
 adws/log/
+frontend/log/
 
 # ADW git worktrees
 trees/
@@ -25,3 +26,5 @@ trees/
 .env
 .env.local
 node_modules
+
+frontend/log
