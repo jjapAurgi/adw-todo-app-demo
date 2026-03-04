@@ -8,8 +8,9 @@ module Adw
     STATUS_EMOJIS = {
       "classifying" => "🏷️",
       "creating_worktree" => "🌿",
-      "setting_up" => "🌲",
-      "installing_deps" => "📦",
+      "isolating" => "🔌",
+      "setting_up" => "📦",
+      "starting" => "🚀",
       "planning" => "📋",
       "implementing" => "🔨",
       "testing" => "🧪",
@@ -30,8 +31,9 @@ module Adw
     LABEL_COLORS = {
       "adw/classifying"        => "C2E0C6",
       "adw/creating_worktree"  => "B2DFDB",
-      "adw/setting_up"         => "C3E6CB",
-      "adw/installing_deps"    => "A5D6A7",
+      "adw/isolating"          => "C3E6CB",
+      "adw/setting_up"         => "A5D6A7",
+      "adw/starting"           => "81C784",
       "adw/planning"     => "BFD4F2",
       "adw/implementing" => "FEF2C0",
       "adw/testing"      => "D4E157",

@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Usage: worktree/start <worktree_path>
+# Starts backend and frontend servers (no infrastructure).
+# Requires worktree/setup to have been run first.
+
+WORKTREE_PATH="$(realpath "${1:?Usage: worktree/start <worktree_path>}")"
+BACKEND_DIR="${WORKTREE_PATH}/backend"
+FRONTEND_DIR="${WORKTREE_PATH}/frontend"
+ENV_FILE="${WORKTREE_PATH}/.env.local"
+
+if [ ! -f "${ENV_FILE}" ]; then
+  echo "ERROR: .env.local not found at ${ENV_FILE}" >&2
+  exit 1
+fi
+
+# Source worktree-specific env vars
+set -a
+# shellcheck disable=SC1090
+source "${ENV_FILE}"
+set +a
+
+# 1. Start backend in background
+echo "Starting backend on port ${PORT}..." >&2
+mkdir -p "${BACKEND_DIR}/log" "${BACKEND_DIR}/tmp/pids"
+(cd "${BACKEND_DIR}" && \
+  nohup env PORT="${PORT}" DATABASE_URL="${DATABASE_URL}" bin/dev \
+  > "${BACKEND_DIR}/log/adw_dev.log" 2>&1 </dev/null &) >/dev/null 2>/dev/null
+
+# 2. Start frontend in background
+echo "Starting frontend on port ${VITE_PORT}..." >&2
+mkdir -p "${FRONTEND_DIR}/log" "${FRONTEND_DIR}/tmp/pids"
+(cd "${FRONTEND_DIR}" && \
+  nohup bin/dev --port "${VITE_PORT}" \
+  > "${FRONTEND_DIR}/log/adw_dev.log" 2>&1 </dev/null &) >/dev/null 2>/dev/null
+
+echo "Services started: backend=http://localhost:${PORT} frontend=http://localhost:${VITE_PORT}" >&2

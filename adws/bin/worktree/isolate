@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Usage: worktree_configure <branch_name> <worktree_path>
+# Usage: worktree/isolate <worktree_path>
 # Calculates deterministic ports from branch name, writes .env.local.
 # Outputs JSON with port assignments to stdout.
 
-BRANCH_NAME="${1:?Usage: worktree_configure <branch_name> <worktree_path>}"
-WORKTREE_PATH="${2:?Usage: worktree_configure <branch_name> <worktree_path>}"
+WORKTREE_PATH="$(realpath "${1:?Usage: worktree/isolate <worktree_path>}")"
+
+# Derive branch name from git
+BRANCH_NAME="$(git -C "${WORKTREE_PATH}" rev-parse --abbrev-ref HEAD)"
 
 # Deterministic port calculation (SHA256-based)
 HASH=$(echo -n "${BRANCH_NAME}" | openssl dgst -sha256 | awk '{print $NF}' | head -c 8)

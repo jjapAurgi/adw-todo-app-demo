@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Usage: worktree/setup <worktree_path>
+# Installs dependencies and prepares infrastructure (no servers).
+# Requires .env.local to exist (run worktree/isolate first).
+
+WORKTREE_PATH="$(realpath "${1:?Usage: worktree/setup <worktree_path>}")"
+BACKEND_DIR="${WORKTREE_PATH}/backend"
+FRONTEND_DIR="${WORKTREE_PATH}/frontend"
+ENV_FILE="${WORKTREE_PATH}/.env.local"
+
+if [ ! -f "${ENV_FILE}" ]; then
+  echo "ERROR: .env.local not found at ${ENV_FILE}" >&2
+  exit 1
+fi
+
+# Source worktree-specific env vars (DATABASE_URL, POSTGRES_PORT, etc.)
+set -a
+# shellcheck disable=SC1090
+source "${ENV_FILE}"
+set +a
+
+# 1. Start postgres via docker compose
+echo "Starting docker compose (project: ${COMPOSE_PROJECT_NAME})..." >&2
+(cd "${BACKEND_DIR}" && \
+  COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME}" \
+  POSTGRES_PORT="${POSTGRES_PORT}" \
+  docker compose up -d) >&2 2>&1
+
+# 2. Wait for postgres (max 30s)
+echo "Waiting for postgres on port ${POSTGRES_PORT}..." >&2
+RETRIES=30
+until pg_isready -h localhost -p "${POSTGRES_PORT}" -q 2>/dev/null; do
+  RETRIES=$((RETRIES - 1))
+  if [ "${RETRIES}" -le 0 ]; then
+    echo "ERROR: Postgres not ready after 30s on port ${POSTGRES_PORT}" >&2
+    exit 1
+  fi
+  sleep 1
+done
+echo "Postgres ready." >&2
+
+# 3. Backend: install deps + prepare database (bin/setup handles both)
+echo "Setting up backend (bundle install + db:prepare)..." >&2
+(cd "${BACKEND_DIR}" && DATABASE_URL="${DATABASE_URL}" bin/setup --skip-server) >&2 2>&1
+
+# 4. Frontend: install deps
+echo "Installing frontend dependencies..." >&2
+(cd "${FRONTEND_DIR}" && npm install) >&2 2>&1
+
+echo "Setup complete" >&2

@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Usage: worktree_destroy <worktree_path>
+# Usage: worktree/destroy <worktree_path>
 # Stops all services and removes the git worktree.
 
-WORKTREE_PATH="${1:?Usage: worktree_destroy <worktree_path>}"
-PROJECT_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+WORKTREE_PATH="$(realpath "${1:?Usage: worktree/destroy <worktree_path>}")"
+PROJECT_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 BACKEND_DIR="${WORKTREE_PATH}/backend"
 FRONTEND_DIR="${WORKTREE_PATH}/frontend"
 
