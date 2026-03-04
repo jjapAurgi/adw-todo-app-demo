@@ -16,6 +16,9 @@
 # ADW execution logs
 adws/log/
 
+# ADW git worktrees
+trees/
+
 # GitHub CLI auth (Docker)
 .gh/
 

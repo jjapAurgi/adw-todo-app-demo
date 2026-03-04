@@ -104,6 +104,39 @@ module Adw
         false
       end
 
+      def trigger_worktree_teardown(branch_name)
+        script_path = File.join(__dir__, "adw_teardown_worktree")
+        puts "INFO: Triggering worktree teardown for branch: #{branch_name}"
+        pid = Process.spawn(
+          RbConfig.ruby, script_path, branch_name,
+          out: $stdout, err: $stderr
+        )
+        Process.detach(pid)
+        puts "INFO: Teardown spawned for #{branch_name} (PID: #{pid})"
+        true
+      rescue => e
+        warn "ERROR: Exception triggering teardown for #{branch_name}: #{e}"
+        false
+      end
+
+      def cleanup_stale_worktrees(open_issue_numbers)
+        trees_dir = File.join(Adw.project_root, "trees")
+        return unless Dir.exist?(trees_dir)
+
+        Dir.entries(trees_dir).reject { |e| e.start_with?(".") }.each do |branch_name|
+          # Branch format: type-ISSUE_NUM-adwid-name
+          parts = branch_name.split("-")
+          next if parts.length < 2
+
+          issue_num = parts[1].to_i
+          next if issue_num == 0
+          next if open_issue_numbers.include?(issue_num)
+
+          puts "INFO: Issue ##{issue_num} closed — removing worktree: #{branch_name}"
+          trigger_worktree_teardown(branch_name)
+        end
+      end
+
       def trigger_workflow(issue_number)
         script_path = File.join(__dir__, "adw_full_pipeline")
 
@@ -209,6 +242,8 @@ module Adw
           if new_qualifying_issues.empty? && patch_comments.empty?
             puts "INFO: No new qualifying issues found"
           end
+
+          cleanup_stale_worktrees(issues.map(&:number).to_set)
 
           cycle_time = Time.now - start_time
           puts "INFO: Check cycle completed in #{cycle_time.round(2)} seconds"

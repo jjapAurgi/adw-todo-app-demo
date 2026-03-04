@@ -7,7 +7,14 @@ module Adw
       input :adw_id
       input :logger
 
-      play Adw::Workflows::PlanBuild,
+      play Adw::Actors::InitializeTracker,
+           Adw::Actors::FetchIssue,
+           Adw::Actors::ClassifyIssue,
+           Adw::Actors::CreateBranch,
+           Adw::Actors::SetupWorktree,
+           Adw::Actors::BuildPlan,
+           Adw::Actors::PublishPlan,
+           Adw::Actors::ImplementPlan,
            Adw::Actors::TestWithResolution,
            Adw::Actors::PublishTestResults,
            Adw::Actors::ReviewCode,

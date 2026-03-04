@@ -7,6 +7,7 @@ module Adw
   module Tracker
     STATUS_EMOJIS = {
       "classifying" => "🏷️",
+      "setting_up" => "🌲",
       "planning" => "📋",
       "implementing" => "🔨",
       "testing" => "🧪",
@@ -26,6 +27,7 @@ module Adw
 
     LABEL_COLORS = {
       "adw/classifying"  => "C2E0C6",
+      "adw/setting_up"   => "C3E6CB",
       "adw/planning"     => "BFD4F2",
       "adw/implementing" => "FEF2C0",
       "adw/testing"      => "D4E157",
@@ -52,6 +54,12 @@ module Adw
         lines << "| **Status** | #{emoji} #{tracker[:status]} |"
         lines << "| **Classification** | #{tracker[:classification] || "pending"} |"
         lines << "| **Branch** | #{tracker[:branch_name] ? "`#{tracker[:branch_name]}`" : "pending"} |"
+        if tracker[:worktree_path]
+          lines << "| **Worktree** | `#{File.basename(tracker[:worktree_path])}` |"
+          lines << "| **Backend** | http://localhost:#{tracker[:backend_port]} |"
+          lines << "| **Frontend** | http://localhost:#{tracker[:frontend_port]} |"
+          lines << "| **Postgres** | localhost:#{tracker[:postgres_port]} (#{tracker[:compose_project]}) |"
+        end
         patches = tracker[:patches] || []
         if patches.any?
           lines << ""
@@ -107,7 +115,12 @@ module Adw
           "branch_name" => tracker[:branch_name],
           "status" => tracker[:status],
           "patches" => (tracker[:patches] || []).map { |p| p.transform_keys(&:to_s) },
-          "phase_comments" => (tracker[:phase_comments] || {})
+          "phase_comments" => (tracker[:phase_comments] || {}),
+          "worktree_path"   => tracker[:worktree_path],
+          "backend_port"    => tracker[:backend_port],
+          "frontend_port"   => tracker[:frontend_port],
+          "postgres_port"   => tracker[:postgres_port],
+          "compose_project" => tracker[:compose_project]
         }
 
         File.write(File.join(dir, "tracker.yaml"), YAML.dump(data))
@@ -137,7 +150,12 @@ module Adw
           branch_name: data["branch_name"],
           status: data["status"],
           patches: (data["patches"] || []).map { |p| p.transform_keys(&:to_sym) },
-          phase_comments: (data["phase_comments"] || {})
+          phase_comments: (data["phase_comments"] || {}),
+          worktree_path:   data["worktree_path"],
+          backend_port:    data["backend_port"],
+          frontend_port:   data["frontend_port"],
+          postgres_port:   data["postgres_port"],
+          compose_project: data["compose_project"]
         }
 
         if migrate
