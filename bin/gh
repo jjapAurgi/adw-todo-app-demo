@@ -4,6 +4,15 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
+# Resolve .gh config directory (may be in main worktree when running from a linked worktree)
+GH_CONFIG="$PROJECT_ROOT/.gh"
+if [[ ! -d "$GH_CONFIG" ]]; then
+  MAIN_TREE="$(git -C "$PROJECT_ROOT" worktree list --porcelain 2>/dev/null | head -1 | sed 's/^worktree //')"
+  if [[ -n "$MAIN_TREE" && -d "$MAIN_TREE/.gh" ]]; then
+    GH_CONFIG="$MAIN_TREE/.gh"
+  fi
+fi
+
 # --- Local-first: usar gh del sistema si está instalado ---
 # Buscar gh en PATH excluyendo nuestro propio directorio bin/
 SEARCH_PATH=":${PATH}:"
@@ -26,7 +35,7 @@ if ! docker image inspect "$IMAGE_NAME" >/dev/null 2>&1; then
 fi
 
 # Crear directorio de config de gh si no existe
-mkdir -p "$PROJECT_ROOT/.gh"
+mkdir -p "$GH_CONFIG"
 
 # -i siempre: reenviar stdin (necesario para gh api --input -)
 # -t solo para comandos interactivos (gh auth login)
@@ -38,7 +47,7 @@ fi
 exec docker run --rm -i $TTY_FLAG \
   -v "$PROJECT_ROOT:$PROJECT_ROOT" \
   -v "/tmp:/tmp" \
-  -v "$PROJECT_ROOT/.gh:/root/.config/gh" \
+  -v "$GH_CONFIG:/root/.config/gh" \
   -w "${PWD}" \
   "$IMAGE_NAME" \
   "$@"
