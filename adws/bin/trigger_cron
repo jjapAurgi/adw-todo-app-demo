@@ -197,7 +197,7 @@ module Adw
         return unless Dir.exist?(trees_dir)
 
         Dir.entries(trees_dir).reject { |e| e.start_with?(".") }.each do |branch_name|
-          # Branch format: type-ISSUE_NUM-adwid-name
+          # Branch format: issue-ISSUE_NUM
           parts = branch_name.split("-")
           next if parts.length < 2
 

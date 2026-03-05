@@ -7,7 +7,7 @@ module Adw
     class InstallWorktreeDeps < Actor
       include Adw::Actors::PipelineInputs
 
-      input :tracker
+      input :tracker, default: -> { {} }
       input :worktree_path
       output :tracker
 

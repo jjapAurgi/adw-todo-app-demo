@@ -8,7 +8,7 @@ module Adw
     class ConfigureWorktree < Actor
       include Adw::Actors::PipelineInputs
 
-      input :tracker
+      input :tracker, default: -> { {} }
       input :branch_name
       input :worktree_path
       output :tracker

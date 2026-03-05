@@ -7,19 +7,17 @@ module Adw
     class CreateWorktree < Actor
       include Adw::Actors::PipelineInputs
 
-      input :issue
-      input :issue_command
-      input :tracker
+      input :tracker, default: -> { {} }
       output :tracker
       output :branch_name
       output :worktree_path
 
       def call
+        tracker[:adw_id] ||= adw_id
         log_actor("Generating branch name and creating worktree")
         Adw::Tracker.update(tracker, issue_number, "creating_worktree", logger)
 
-        issue_type = issue_command.delete_prefix("/")
-        name = Adw::BranchName.generate(issue_type, issue_number, adw_id, issue.title)
+        name = "issue-#{issue_number}"
         logger.info("Generated branch name: #{name}")
 
         script = File.join(Adw.project_root, "adws", "bin", "worktree_create")

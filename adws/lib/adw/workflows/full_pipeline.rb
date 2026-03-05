@@ -7,10 +7,10 @@ module Adw
       input :adw_id
       input :logger
 
-      play Adw::Actors::InitializeTracker,
+      play Adw::Actors::SetupWorktree,
+           Adw::Actors::InitializeTracker,
            Adw::Actors::FetchIssue,
            Adw::Actors::ClassifyIssue,
-           Adw::Actors::SetupWorktree,
            Adw::Actors::BuildPlan,
            Adw::Actors::PublishPlan,
            Adw::Actors::ImplementPlan,

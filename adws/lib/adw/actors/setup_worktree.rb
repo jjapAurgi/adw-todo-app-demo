@@ -6,9 +6,7 @@ module Adw
       input :issue_number
       input :adw_id
       input :logger
-      input :tracker
-      input :issue
-      input :issue_command
+      input :tracker, default: -> { {} }
       output :tracker
       output :branch_name
       output :worktree_path

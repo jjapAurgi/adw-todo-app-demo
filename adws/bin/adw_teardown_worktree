@@ -17,7 +17,7 @@ end
 
 branch_name  = ARGV[0]
 adw_id       = Adw::Utils.make_adw_id
-# Branch format: type-ISSUE_NUM-adwid-name
+# Branch format: issue-ISSUE_NUM
 issue_number = branch_name.split("-")[1].to_i
 
 if issue_number == 0
