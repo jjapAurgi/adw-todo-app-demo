@@ -17,7 +17,7 @@ module Adw
         log_actor("Configuring environment for: #{path}")
         Adw::Tracker.update(tracker, issue_number, "isolating", logger)
 
-        adws_root = File.expand_path("../../../..", __dir__)
+        adws_root = File.expand_path("../../..", __dir__)
         script = File.join(adws_root, "bin", "worktree", "isolate")
         stdout, stderr, status = Open3.capture3(script, path)
 
