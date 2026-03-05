@@ -4,16 +4,14 @@ module Adw
   module Actors
     # Builds a patch plan from a human comment.
     # Expects the patch context to be already initialized (by InitializePatchContext),
-    # so tracker is the patch_tracker and adw_id is the patch_adw_id.
+    # so tracker is the patch workflow tracker and adw_id is the patch_adw_id.
     class BuildPatchPlan < Actor
       include Adw::Actors::PipelineInputs
 
       input :comment_body
-      input :tracker             # patch_tracker (with _type: :patch)
-      input :main_tracker, default: -> { nil }
+      input :tracker
       output :tracker
-      output :main_tracker
-      output :plan_path          # path to the patch plan file (for PublishPlan, ImplementPlan)
+      output :plan_path
 
       def call
         log_actor("Building patch plan")
@@ -38,30 +36,20 @@ module Adw
 
         unless response.success
           Adw::Tracker.update(tracker, issue_number, "error", logger)
-          Adw::Tracker.update(main_tracker, issue_number, "done", logger) if main_tracker
           fail!(error: "Patch plan creation failed: #{response.output}")
         end
 
-        # The /adw:patch command returns the actual file path it created
-        # (naming: patch-{n}-{descriptive-name}.md, not predictable by the actor)
-        patch_file = response.output.strip
-        if patch_file.empty?
-          patch_file = ".issues/#{issue_number}/patch-#{issue_number}-#{adw_id}.md"
-          logger.warn("Agent did not return patch file path, using fallback: #{patch_file}")
+        plan_file = response.output.strip
+        if plan_file.empty?
+          plan_file = ".issues/#{issue_number}/patch-#{issue_number}-#{adw_id}.md"
+          logger.warn("Agent did not return patch file path, using fallback: #{plan_file}")
         end
 
-        tracker[:patch_file] = patch_file
+        tracker[:plan_path] = plan_file
+        Adw::Tracker.save(issue_number, tracker)
 
-        # Register patch in main tracker
-        if main_tracker
-          Adw::Tracker.add_patch(main_tracker, patch_file, nil, tracker[:comment_id], adw_id, logger)
-          Adw::Tracker.save(issue_number, main_tracker)
-        end
-
-        Adw::Tracker.save(issue_number, tracker) # dispatches to save_patch via _type
-
-        self.plan_path = patch_file
-        logger.info("Patch plan created: #{patch_file}")
+        self.plan_path = plan_file
+        logger.info("Patch plan created: #{plan_file}")
       end
     end
   end

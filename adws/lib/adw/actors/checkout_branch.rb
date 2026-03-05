@@ -10,9 +10,9 @@ module Adw
       input :tracker
 
       def call
-        branch_name = tracker[:branch_name]
+        branch_name = issue_tracker[:branch_name]
         unless branch_name
-          fail!(error: "No branch_name in tracker")
+          fail!(error: "No branch_name in issue_tracker")
         end
 
         _, stderr, status = Open3.capture3("git", "checkout", branch_name)

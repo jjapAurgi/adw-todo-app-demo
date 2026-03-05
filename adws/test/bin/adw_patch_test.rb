@@ -10,7 +10,6 @@ class AdwPatchTest < Minitest::Test
     @adw_id = "test1234"
     @logger = build_logger
     @comment_body = "Fix the button color"
-    @main_tracker = build_tracker(branch_name: "feature/test-123", status: "done")
 
     # Stub external I/O
     Adw::GitHub.stubs(:repo_url).returns("https://github.com/test/repo")
@@ -19,13 +18,15 @@ class AdwPatchTest < Minitest::Test
     Adw::GitHub.stubs(:create_issue_comment).returns("123")
     Adw::GitHub.stubs(:update_issue_comment)
     Adw::GitHub.stubs(:transition_label)
-    Adw::Tracker.stubs(:load).returns(@main_tracker)
+    Adw::Tracker::Issue.stubs(:load).returns(build_issue_tracker(branch_name: "feature/test-123"))
+    Adw::Tracker::Issue.stubs(:sync)
+    Adw::Tracker::Issue.stubs(:save)
+    Adw::Tracker::Issue.stubs(:add_workflow)
     Adw::Tracker.stubs(:update)
-    Adw::Tracker.stubs(:update_patch)
     Adw::Tracker.stubs(:save)
-    Adw::Tracker.stubs(:save_patch)
     Adw::Tracker.stubs(:set_phase_comment)
-    Adw::Tracker.stubs(:add_patch)
+    Adw::Tracker::Workflow.stubs(:update)
+    Adw::Tracker::Workflow.stubs(:save)
     Adw::PipelineHelpers.stubs(:plan_path_for).returns(File.join(Adw.project_root, ".issues", "42", "plan.md"))
     Adw::PipelineHelpers.stubs(:parse_issue_review_results).returns({
       success: true, screenshots: [], review_issues: []
@@ -66,9 +67,9 @@ class AdwPatchTest < Minitest::Test
     })
   end
 
-  # When no tracker exists, patch should fail early
-  def test_fails_when_no_tracker_found
-    Adw::Tracker.stubs(:load).returns(nil)
+  # When no issue tracker exists, patch should fail (no branch_name)
+  def test_fails_when_no_issue_tracker_found
+    Adw::Tracker::Issue.stubs(:load).returns(nil)
 
     result = Adw::Workflows::Patch.result(
       issue_number: @issue_number,
@@ -78,7 +79,7 @@ class AdwPatchTest < Minitest::Test
     )
 
     refute result.success?
-    assert_match(/No tracker found/, result.error)
+    assert_match(/No branch_name/, result.error)
   end
 
   # When issue cannot be fetched, patch should fail
@@ -96,10 +97,9 @@ class AdwPatchTest < Minitest::Test
     assert_match(/Could not fetch issue/, result.error)
   end
 
-  # When tracker has no branch_name, patch should fail
-  def test_fails_when_tracker_has_no_branch_name
-    tracker_without_branch = build_tracker(branch_name: nil, status: "done")
-    Adw::Tracker.stubs(:load).returns(tracker_without_branch)
+  # When issue tracker has no branch_name, patch should fail
+  def test_fails_when_issue_tracker_has_no_branch_name
+    Adw::Tracker::Issue.stubs(:load).returns(build_issue_tracker(branch_name: nil))
 
     result = Adw::Workflows::Patch.result(
       issue_number: @issue_number,
@@ -185,7 +185,7 @@ class AdwPatchTest < Minitest::Test
     )
 
     refute result.success?
-    assert_match(/Patch plan failed/, result.error)
+    assert_match(/Patch plan creation failed/, result.error)
   end
 
   # Patch implementation failure stops the workflow
@@ -204,7 +204,7 @@ class AdwPatchTest < Minitest::Test
     )
 
     refute result.success?
-    assert_match(/Patch implementation failed/, result.error)
+    assert_match(/Implementation failed/, result.error)
   end
 
   # Tests failing stops the patch workflow

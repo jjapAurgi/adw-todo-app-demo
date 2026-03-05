@@ -48,7 +48,7 @@ module Adw
       private
 
       def default_commit_message
-        issue_class = tracker[:classification] || "/chore"
+        issue_class = issue_tracker[:classification] || "/chore"
         issue_type = issue_class.delete_prefix("/")
         number = issue&.number || issue_number
         "#{issue_type}: implement, test, review and document ##{number}"

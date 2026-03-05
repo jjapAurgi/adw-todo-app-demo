@@ -17,7 +17,9 @@ class AdwPlanBuildTest < Minitest::Test
     Adw::GitHub.stubs(:create_issue_comment).returns("123")
     Adw::GitHub.stubs(:update_issue_comment)
     Adw::GitHub.stubs(:transition_label)
-    Adw::Tracker.stubs(:load).returns(nil)
+    Adw::Tracker::Issue.stubs(:load).returns(nil)
+    Adw::Tracker::Issue.stubs(:sync)
+    Adw::Tracker::Issue.stubs(:save)
     Adw::Tracker.stubs(:update)
     Adw::Tracker.stubs(:save)
     Adw::Tracker.stubs(:set_phase_comment)
@@ -129,7 +131,7 @@ class AdwPlanBuildTest < Minitest::Test
 
   # Tracker is initialized even when no prior state exists
   def test_initializes_tracker_from_scratch
-    Adw::Tracker.stubs(:load).returns(nil)
+    Adw::Tracker::Issue.stubs(:load).returns(nil)
     Adw::Agent.stubs(:execute_template).returns(
       success_response(output: "/feature"),          # 1. classify
       success_response(output: "feature/issue-42"),  # 2. branch

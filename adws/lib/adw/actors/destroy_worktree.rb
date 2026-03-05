@@ -8,33 +8,34 @@ module Adw
       include Adw::Actors::PipelineInputs
 
       input :tracker
+      output :issue_tracker
       output :tracker
 
       def call
-        worktree_path = tracker[:worktree_path]
+        wt_path = issue_tracker[:worktree_path]
 
-        unless worktree_path && Dir.exist?(worktree_path)
+        unless wt_path && Dir.exist?(wt_path)
           logger.info("[DestroyWorktree] No active worktree found, skipping")
           return
         end
 
-        log_actor("Destroying worktree: #{worktree_path}")
+        log_actor("Destroying worktree: #{wt_path}")
 
         script = File.join(Adw.project_root, "adws", "bin", "worktree", "destroy")
-        _, stderr, status = Open3.capture3(script, worktree_path)
+        _, stderr, status = Open3.capture3(script, wt_path)
 
         unless status.success?
           logger.warn("[DestroyWorktree] Destroy had issues (non-blocking): #{stderr.strip}")
         end
 
-        tracker.delete(:worktree_path)
-        tracker.delete(:backend_port)
-        tracker.delete(:frontend_port)
-        tracker.delete(:postgres_port)
-        tracker.delete(:compose_project)
-        Adw::Tracker.save(issue_number, tracker)
+        issue_tracker.delete(:worktree_path)
+        issue_tracker.delete(:backend_port)
+        issue_tracker.delete(:frontend_port)
+        issue_tracker.delete(:postgres_port)
+        issue_tracker.delete(:compose_project)
+        Adw::Tracker::Issue.save(issue_number, issue_tracker)
 
-        logger.info("Worktree destroyed: #{worktree_path}")
+        logger.info("Worktree destroyed: #{wt_path}")
       end
     end
   end

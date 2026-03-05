@@ -73,14 +73,22 @@ module TestHelpers
     Adw::AgentPromptResponse.new(defaults.merge(overrides))
   end
 
-  def build_tracker(overrides = {})
+  def build_issue_tracker(overrides = {})
     defaults = {
       comment_id: "123",
-      adw_id: "abc12345",
       classification: "/feature",
       branch_name: "feature/test-branch",
+      workflows: []
+    }
+    defaults.merge(overrides)
+  end
+
+  def build_workflow_tracker(overrides = {})
+    defaults = {
+      adw_id: "abc12345",
+      workflow_type: "full_pipeline",
+      comment_id: nil,
       status: "testing",
-      patches: [],
       phase_comments: {}
     }
     defaults.merge(overrides)
@@ -260,43 +268,28 @@ module TestFactories
     Adw::AgentPromptResponse.new(output: output, success: success, session_id: session_id)
   end
 
-  def build_tracker(
-    comment_id: "123456",
-    adw_id: "test1234",
-    classification: "bug",
-    branch_name: "feature/test-123",
-    status: "done",
-    patches: [],
-    phase_comments: {}
-  )
+  def build_issue_tracker(overrides = {})
     {
-      comment_id: comment_id,
-      adw_id: adw_id,
-      classification: classification,
-      branch_name: branch_name,
-      status: status,
-      patches: patches,
-      phase_comments: phase_comments
-    }
+      comment_id: "123456",
+      classification: "bug",
+      branch_name: "feature/test-123",
+      workflows: []
+    }.merge(overrides)
   end
 
-  def build_patch_tracker(
-    comment_id: nil,
-    adw_id: "patch123",
-    status: nil,
-    trigger_comment: "Fix the button color",
-    patch_file: nil,
-    phase_comments: {}
-  )
+  def build_workflow_tracker(overrides = {})
     {
-      comment_id: comment_id,
-      adw_id: adw_id,
-      status: status,
-      trigger_comment: trigger_comment,
-      patch_file: patch_file,
-      phase_comments: phase_comments
-    }
+      adw_id: "test1234",
+      workflow_type: "full_pipeline",
+      comment_id: nil,
+      status: "done",
+      phase_comments: {}
+    }.merge(overrides)
   end
+
+  # Backward-compat alias: returns a workflow tracker hash for tests
+  # that just need a generic tracker input
+  alias_method :build_tracker, :build_workflow_tracker
 
   def build_issue(
     number: 42,

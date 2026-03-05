@@ -31,6 +31,7 @@ module Adw
           fail!(error: "Plan build failed: #{response.output}")
         end
 
+        tracker[:plan_path] = path
         self.plan_path = path
         logger.info("Plan created at: #{path}")
       end

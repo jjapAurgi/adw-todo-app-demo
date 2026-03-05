@@ -10,7 +10,8 @@ class DestroyWorktreeTest < Minitest::Test
     @adw_id = "abc12345"
     @logger = build_logger
     @worktree_path = "/abs/path/trees/feat-42-abc12345-add-login"
-    @tracker = build_tracker.merge(
+    @tracker = build_workflow_tracker
+    @issue_tracker_data = build_issue_tracker(
       worktree_path: @worktree_path,
       backend_port: 8042,
       frontend_port: 9042,
@@ -20,9 +21,10 @@ class DestroyWorktreeTest < Minitest::Test
 
     Adw::Tracker.stubs(:update)
     Adw::Tracker.stubs(:save)
+    Adw::Tracker::Issue.stubs(:save)
   end
 
-  def test_destroys_worktree_and_cleans_tracker
+  def test_destroys_worktree_and_cleans_issue_tracker
     Dir.stubs(:exist?).with(@worktree_path).returns(true)
     Open3.stubs(:capture3).returns(["", "", mock_success_status])
 
@@ -30,26 +32,28 @@ class DestroyWorktreeTest < Minitest::Test
       issue_number: @issue_number,
       adw_id: @adw_id,
       logger: @logger,
-      tracker: @tracker
+      tracker: @tracker,
+      issue_tracker: @issue_tracker_data
     )
 
     assert result.success?
-    assert_nil result.tracker[:worktree_path]
-    assert_nil result.tracker[:backend_port]
-    assert_nil result.tracker[:frontend_port]
-    assert_nil result.tracker[:postgres_port]
-    assert_nil result.tracker[:compose_project]
+    assert_nil result.issue_tracker[:worktree_path]
+    assert_nil result.issue_tracker[:backend_port]
+    assert_nil result.issue_tracker[:frontend_port]
+    assert_nil result.issue_tracker[:postgres_port]
+    assert_nil result.issue_tracker[:compose_project]
   end
 
   def test_skips_when_no_worktree_path
-    tracker = build_tracker
-    tracker.delete(:worktree_path)
+    issue_tracker_no_wt = build_issue_tracker
+    issue_tracker_no_wt.delete(:worktree_path)
 
     result = Adw::Actors::DestroyWorktree.result(
       issue_number: @issue_number,
       adw_id: @adw_id,
       logger: @logger,
-      tracker: tracker
+      tracker: @tracker,
+      issue_tracker: issue_tracker_no_wt
     )
 
     assert result.success?
@@ -62,7 +66,8 @@ class DestroyWorktreeTest < Minitest::Test
       issue_number: @issue_number,
       adw_id: @adw_id,
       logger: @logger,
-      tracker: @tracker
+      tracker: @tracker,
+      issue_tracker: @issue_tracker_data
     )
 
     assert result.success?
@@ -76,11 +81,12 @@ class DestroyWorktreeTest < Minitest::Test
       issue_number: @issue_number,
       adw_id: @adw_id,
       logger: @logger,
-      tracker: @tracker
+      tracker: @tracker,
+      issue_tracker: @issue_tracker_data
     )
 
     assert result.success?
-    assert_nil result.tracker[:worktree_path]
+    assert_nil result.issue_tracker[:worktree_path]
   end
 
   private

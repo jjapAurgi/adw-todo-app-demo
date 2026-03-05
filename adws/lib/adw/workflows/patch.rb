@@ -5,7 +5,7 @@ module Adw
     # Patch workflow for applying human feedback to completed issues.
     # Two-phase play chain structure consistent with FullPipeline:
     # - Setup: load tracker, fetch issue, checkout branch, classify comment
-    # - Pipeline: initialize patch context → plan → implement → test → review → commit → push → done
+    # - Pipeline: initialize patch context -> plan -> implement -> test -> review -> commit -> push -> done
     class Patch < Actor
       input :issue_number
       input :adw_id
@@ -35,7 +35,7 @@ module Adw
              Adw::Actors::GenerateDocs,
              Adw::Actors::CommitChanges,
              Adw::Actors::PushBranch,
-             Adw::Actors::MarkPatchDone
+             Adw::Actors::MarkDone
       end
 
       def call
@@ -67,17 +67,15 @@ module Adw
           adw_id: adw_id,
           logger: logger,
           tracker: setup.tracker,
+          issue_tracker: setup.issue_tracker,
           issue: setup.issue,
           comment_body: comment_body,
           worktree_path: setup.worktree_path
         )
 
         unless pipeline.success?
-          # Error recovery: restore main tracker to "done" if pipeline failed
-          # (main_tracker may not be available if InitializePatchContext didn't run)
-          if pipeline.respond_to?(:main_tracker) && pipeline.main_tracker
-            Adw::Tracker.update(pipeline.main_tracker, issue_number, "done", logger)
-          end
+          # Error recovery: restore label to done since the original work was completed
+          Adw::GitHub.transition_label(issue_number, "adw/done", "adw/error")
           fail!(error: pipeline.error)
         end
       end

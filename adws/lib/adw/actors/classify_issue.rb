@@ -5,6 +5,7 @@ module Adw
       include Adw::Actors::PipelineInputs
       input :issue
       input :tracker
+      output :issue_tracker
       output :tracker
       output :issue_command
 
@@ -35,7 +36,8 @@ module Adw
           fail!(error: "Invalid classification: #{response.output}")
         end
 
-        tracker[:classification] = command
+        issue_tracker[:classification] = command
+        Adw::Tracker::Issue.sync(issue_tracker, issue_number, logger)
         self.issue_command = command
       end
     end

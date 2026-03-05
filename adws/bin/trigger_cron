@@ -149,8 +149,9 @@ module Adw
         # Skip bot comments
         return nil if Adw::PipelineHelpers.bot_comment?(comment_body)
 
-        # Skip tracker comments
-        return nil if comment_body.include?(Adw::Tracker::COMMENT_MARKER)
+        # Skip tracker comments (both issue and workflow markers)
+        return nil if comment_body.include?(Adw::Tracker::ISSUE_COMMENT_MARKER)
+        return nil if comment_body.include?(Adw::Tracker::WORKFLOW_COMMENT_MARKER)
 
         # New human comment on a done issue → trigger patch
         clog(issue_number, "INFO: Issue ##{issue_number} (adw/done) - new human comment detected")

@@ -26,8 +26,6 @@ module Adw
 
     STATUSES = STATUS_EMOJIS.keys.freeze
 
-    COMMENT_MARKER = "<!-- adw_tracker:v1 -->"
-
     LABEL_COLORS = {
       "adw/classifying"        => "C2E0C6",
       "adw/creating_worktree"  => "B2DFDB",
@@ -47,227 +45,319 @@ module Adw
       "adw/error"        => "E11D48"
     }.freeze
 
+    ISSUE_COMMENT_MARKER = "<!-- adw_issue:v1 -->"
+    WORKFLOW_COMMENT_MARKER = "<!-- adw_workflow:v1 -->"
+
+    # Backward-compat delegations: actors calling Tracker.update/save/set_phase_comment
+    # operate on workflow trackers by default.
     class << self
-      def render_comment(tracker)
-        emoji = STATUS_EMOJIS.fetch(tracker[:status], "❓")
-
-        lines = []
-        lines << "## 🤖 ADW Tracker"
-        lines << ""
-        lines << "| Field | Value |"
-        lines << "|-------|-------|"
-        lines << "| **ADW ID** | `#{tracker[:adw_id]}` |"
-        lines << "| **Status** | #{emoji} #{tracker[:status]} |"
-        lines << "| **Classification** | #{tracker[:classification] || "pending"} |"
-        lines << "| **Branch** | #{tracker[:branch_name] ? "`#{tracker[:branch_name]}`" : "pending"} |"
-        if tracker[:worktree_path]
-          lines << "| **Worktree** | `#{File.basename(tracker[:worktree_path])}` |"
-          lines << "| **Backend** | http://localhost:#{tracker[:backend_port]} |"
-          lines << "| **Frontend** | http://localhost:#{tracker[:frontend_port]} |"
-          lines << "| **Postgres** | localhost:#{tracker[:postgres_port]} (#{tracker[:compose_project]}) |"
-        end
-        patches = tracker[:patches] || []
-        if patches.any?
-          lines << ""
-          lines << "### Patches"
-          lines << ""
-          patches.each_with_index do |patch, idx|
-            file_name = File.basename(patch[:file] || "unknown")
-            lines << "#{idx + 1}. `#{file_name}`"
-          end
-        end
-
-        lines << ""
-        lines << COMMENT_MARKER
-
-        lines.join("\n")
-      end
-
       def update(tracker, issue_number, new_status, logger)
-        if tracker[:_type] == :patch
-          update_patch(tracker, issue_number, new_status, logger)
-          return
-        end
-
-        unless STATUSES.include?(new_status)
-          raise ArgumentError, "Unknown tracker status: #{new_status}. Valid: #{STATUSES.join(', ')}"
-        end
-
-        old_status = tracker[:status]
-        tracker[:status] = new_status
-
-        body = render_comment(tracker)
-
-        if tracker[:comment_id]
-          Adw::GitHub.update_issue_comment(tracker[:comment_id], body)
-        else
-          comment_id = Adw::GitHub.create_issue_comment(issue_number, body)
-          tracker[:comment_id] = comment_id
-        end
-
-        # Transition label
-        old_label = old_status ? "adw/#{old_status}" : nil
-        Adw::GitHub.transition_label(issue_number, "adw/#{new_status}", old_label)
-
-        # Persist tracker to disk
-        save(issue_number, tracker)
-
-        logger.info("Tracker updated: adw/#{new_status}")
+        Workflow.update(tracker, issue_number, new_status, logger)
       end
 
       def save(issue_number, tracker)
-        if tracker[:_type] == :patch
-          save_patch(issue_number, tracker[:adw_id], tracker)
-          return
-        end
-
-        dir = tracker_dir(issue_number)
-        FileUtils.mkdir_p(dir)
-
-        data = {
-          "comment_id" => tracker[:comment_id],
-          "adw_id" => tracker[:adw_id],
-          "classification" => tracker[:classification],
-          "branch_name" => tracker[:branch_name],
-          "status" => tracker[:status],
-          "patches" => (tracker[:patches] || []).map { |p| p.transform_keys(&:to_s) },
-          "phase_comments" => (tracker[:phase_comments] || {}),
-          "worktree_path"   => tracker[:worktree_path],
-          "backend_port"    => tracker[:backend_port],
-          "frontend_port"   => tracker[:frontend_port],
-          "postgres_port"   => tracker[:postgres_port],
-          "compose_project" => tracker[:compose_project]
-        }
-
-        File.write(File.join(dir, "tracker.yaml"), YAML.dump(data))
-      end
-
-      def load(issue_number)
-        dir = tracker_dir(issue_number)
-        yaml_path = File.join(dir, "tracker.yaml")
-        md_path   = File.join(dir, "tracker.md")
-
-        if File.exist?(yaml_path)
-          raw = File.read(yaml_path)
-        elsif File.exist?(md_path)
-          raw = File.read(md_path)
-          migrate = true
-        else
-          return nil
-        end
-
-        data = YAML.safe_load(raw)
-        return nil unless data.is_a?(Hash)
-
-        tracker = {
-          comment_id: data["comment_id"],
-          adw_id: data["adw_id"],
-          classification: data["classification"],
-          branch_name: data["branch_name"],
-          status: data["status"],
-          patches: (data["patches"] || []).map { |p| p.transform_keys(&:to_sym) },
-          phase_comments: (data["phase_comments"] || {}),
-          worktree_path:   data["worktree_path"],
-          backend_port:    data["backend_port"],
-          frontend_port:   data["frontend_port"],
-          postgres_port:   data["postgres_port"],
-          compose_project: data["compose_project"]
-        }
-
-        if migrate
-          save(issue_number, tracker)
-          File.delete(md_path)
-        end
-
-        tracker
-      rescue Errno::ENOENT, Psych::SyntaxError
-        nil
+        Workflow.save(issue_number, tracker)
       end
 
       def set_phase_comment(tracker, phase, comment_id)
-        return unless comment_id
-
-        tracker[:phase_comments] ||= {}
-        tracker[:phase_comments][phase.to_s] = comment_id
+        Workflow.set_phase_comment(tracker, phase, comment_id)
       end
+    end
 
-      def add_patch(tracker, patch_file, plan_comment_id, patch_tracker_comment_id, patch_adw_id, logger)
-        tracker[:patches] ||= []
-        tracker[:patches] << {
-          file: patch_file,
-          comment_id: plan_comment_id,
-          tracker_comment_id: patch_tracker_comment_id,
-          adw_id: patch_adw_id
-        }
-        logger.info("Patch registered in tracker: #{patch_file}")
-      end
+    module Issue
+      ISSUE_FIELDS = %w[comment_id classification branch_name worktree_path
+                        backend_port frontend_port postgres_port compose_project].freeze
 
-      def render_patch_comment(patch_tracker)
-        emoji = STATUS_EMOJIS.fetch(patch_tracker[:status], "❓")
-        trigger = patch_tracker[:trigger_comment].to_s
-        trigger_preview = trigger.length > 80 ? "#{trigger[0..79]}..." : trigger
+      class << self
+        def load(issue_number)
+          dir = tracker_dir(issue_number)
+          issue_path = File.join(dir, "issue.yaml")
 
-        lines = []
-        lines << "## 🩹 ADW Patch Tracker"
-        lines << ""
-        lines << "| Field | Value |"
-        lines << "|-------|-------|"
-        lines << "| **ADW ID** | `#{patch_tracker[:adw_id]}` |"
-        lines << "| **Status** | #{emoji} #{patch_tracker[:status]} |"
-        lines << "| **Trigger** | #{trigger_preview} |"
-        lines << "| **Plan** | `#{patch_tracker[:patch_file]}` |" if patch_tracker[:patch_file]
-        lines << ""
-        lines << COMMENT_MARKER
-
-        lines.join("\n")
-      end
-
-      def save_patch(issue_number, adw_id, patch_tracker)
-        dir = tracker_dir(issue_number)
-        FileUtils.mkdir_p(dir)
-
-        data = {
-          "comment_id"      => patch_tracker[:comment_id],
-          "adw_id"          => patch_tracker[:adw_id],
-          "status"          => patch_tracker[:status],
-          "trigger_comment" => patch_tracker[:trigger_comment],
-          "patch_file"      => patch_tracker[:patch_file],
-          "phase_comments"  => (patch_tracker[:phase_comments] || {})
-        }
-
-        File.write(File.join(dir, "patch-tracker-#{adw_id}.yaml"), YAML.dump(data))
-      end
-
-      def update_patch(patch_tracker, issue_number, new_status, logger)
-        unless STATUSES.include?(new_status)
-          raise ArgumentError, "Unknown tracker status: #{new_status}. Valid: #{STATUSES.join(', ')}"
+          if File.exist?(issue_path)
+            load_from_yaml(issue_path)
+          else
+            migrate_legacy(issue_number, dir)
+          end
+        rescue Errno::ENOENT, Psych::SyntaxError
+          nil
         end
 
-        old_status = patch_tracker[:status]
-        patch_tracker[:status] = new_status
+        def save(issue_number, issue_tracker)
+          dir = tracker_dir(issue_number)
+          FileUtils.mkdir_p(dir)
 
-        body = render_patch_comment(patch_tracker)
+          data = {
+            "comment_id"      => issue_tracker[:comment_id],
+            "classification"  => issue_tracker[:classification],
+            "branch_name"     => issue_tracker[:branch_name],
+            "worktree_path"   => issue_tracker[:worktree_path],
+            "backend_port"    => issue_tracker[:backend_port],
+            "frontend_port"   => issue_tracker[:frontend_port],
+            "postgres_port"   => issue_tracker[:postgres_port],
+            "compose_project" => issue_tracker[:compose_project],
+            "workflows"       => (issue_tracker[:workflows] || []).map { |w| w.transform_keys(&:to_s) }
+          }
 
-        if patch_tracker[:comment_id]
-          Adw::GitHub.update_issue_comment(patch_tracker[:comment_id], body)
-        else
-          comment_id = Adw::GitHub.create_issue_comment(issue_number, body)
-          patch_tracker[:comment_id] = comment_id
+          File.write(File.join(dir, "issue.yaml"), YAML.dump(data))
         end
 
-        old_label = old_status ? "adw/#{old_status}" : nil
-        Adw::GitHub.transition_label(issue_number, "adw/#{new_status}", old_label)
+        def render_comment(issue_tracker)
+          lines = []
+          lines << "## 🤖 ADW Issue"
+          lines << ""
+          lines << "| Field | Value |"
+          lines << "|-------|-------|"
+          lines << "| **Classification** | #{issue_tracker[:classification] || "pending"} |"
+          lines << "| **Branch** | #{issue_tracker[:branch_name] ? "`#{issue_tracker[:branch_name]}`" : "pending"} |"
+          if issue_tracker[:worktree_path]
+            lines << "| **Worktree** | `#{File.basename(issue_tracker[:worktree_path])}` |"
+            lines << "| **Backend** | http://localhost:#{issue_tracker[:backend_port]} |"
+            lines << "| **Frontend** | http://localhost:#{issue_tracker[:frontend_port]} |"
+            lines << "| **Postgres** | localhost:#{issue_tracker[:postgres_port]} (#{issue_tracker[:compose_project]}) |"
+          end
+          workflows = issue_tracker[:workflows] || []
+          if workflows.any?
+            lines << ""
+            lines << "### Workflows"
+            lines << ""
+            workflows.each_with_index do |wf, idx|
+              lines << "#{idx + 1}. `#{wf[:adw_id]}` (#{wf[:type]})"
+            end
+          end
 
-        save_patch(issue_number, patch_tracker[:adw_id], patch_tracker)
+          lines << ""
+          lines << ISSUE_COMMENT_MARKER
 
-        logger.info("Patch tracker updated: adw/#{new_status}")
+          lines.join("\n")
+        end
+
+        def sync(issue_tracker, issue_number, logger)
+          save(issue_number, issue_tracker)
+
+          body = render_comment(issue_tracker)
+
+          if issue_tracker[:comment_id]
+            Adw::GitHub.update_issue_comment(issue_tracker[:comment_id], body)
+          else
+            comment_id = Adw::GitHub.create_issue_comment(issue_number, body)
+            issue_tracker[:comment_id] = comment_id
+            save(issue_number, issue_tracker)
+          end
+
+          logger.info("Issue tracker synced")
+        end
+
+        def add_workflow(issue_tracker, adw_id:, type:)
+          issue_tracker[:workflows] ||= []
+          issue_tracker[:workflows] << { adw_id: adw_id, type: type }
+        end
+
+        private
+
+        def tracker_dir(issue_number)
+          File.join(Adw.project_root, ".issues", issue_number.to_s)
+        end
+
+        def load_from_yaml(path)
+          data = YAML.safe_load(File.read(path))
+          return nil unless data.is_a?(Hash)
+
+          {
+            comment_id:      data["comment_id"],
+            classification:  data["classification"],
+            branch_name:     data["branch_name"],
+            worktree_path:   data["worktree_path"],
+            backend_port:    data["backend_port"],
+            frontend_port:   data["frontend_port"],
+            postgres_port:   data["postgres_port"],
+            compose_project: data["compose_project"],
+            workflows:       (data["workflows"] || []).map { |w| w.transform_keys(&:to_sym) }
+          }
+        end
+
+        def migrate_legacy(issue_number, dir)
+          yaml_path = File.join(dir, "tracker.yaml")
+          md_path   = File.join(dir, "tracker.md")
+
+          if File.exist?(yaml_path)
+            source_path = yaml_path
+          elsif File.exist?(md_path)
+            source_path = md_path
+          else
+            return nil
+          end
+
+          data = YAML.safe_load(File.read(source_path))
+          return nil unless data.is_a?(Hash)
+
+          # Extract issue-level fields
+          issue_tracker = {
+            comment_id:      data["comment_id"],
+            classification:  data["classification"],
+            branch_name:     data["branch_name"],
+            worktree_path:   data["worktree_path"],
+            backend_port:    data["backend_port"],
+            frontend_port:   data["frontend_port"],
+            postgres_port:   data["postgres_port"],
+            compose_project: data["compose_project"],
+            workflows:       []
+          }
+
+          # Create workflow tracker from main tracker data
+          if data["adw_id"]
+            workflow_tracker = {
+              adw_id:          data["adw_id"],
+              workflow_type:   "full_pipeline",
+              comment_id:      nil,
+              status:          data["status"],
+              plan_path:       nil,
+              phase_comments:  data["phase_comments"] || {},
+              trigger_comment: nil
+            }
+            Workflow.save(issue_number, workflow_tracker)
+            add_workflow(issue_tracker, adw_id: data["adw_id"], type: "full_pipeline")
+          end
+
+          # Migrate patch trackers
+          Dir.glob(File.join(dir, "patch-tracker-*.yaml")).each do |patch_path|
+            patch_data = YAML.safe_load(File.read(patch_path))
+            next unless patch_data.is_a?(Hash)
+
+            patch_wf = {
+              adw_id:          patch_data["adw_id"],
+              workflow_type:   "patch",
+              comment_id:      patch_data["comment_id"],
+              status:          patch_data["status"],
+              plan_path:       patch_data["patch_file"],
+              phase_comments:  patch_data["phase_comments"] || {},
+              trigger_comment: patch_data["trigger_comment"]
+            }
+            Workflow.save(issue_number, patch_wf)
+            add_workflow(issue_tracker, adw_id: patch_data["adw_id"], type: "patch")
+            File.delete(patch_path)
+          end
+
+          # Save new format and clean up legacy
+          save(issue_number, issue_tracker)
+          File.delete(source_path) if File.exist?(source_path)
+
+          issue_tracker
+        end
       end
+    end
 
-      private
+    module Workflow
+      class << self
+        def create(adw_id:, workflow_type:, trigger_comment: nil, plan_path: nil)
+          {
+            adw_id:          adw_id,
+            workflow_type:   workflow_type,
+            comment_id:      nil,
+            status:          nil,
+            plan_path:       plan_path,
+            phase_comments:  {},
+            trigger_comment: trigger_comment
+          }
+        end
 
-      def tracker_dir(issue_number)
-        project_root = Adw.project_root
-        File.join(project_root, ".issues", issue_number.to_s)
+        def load(issue_number, adw_id)
+          dir = workflows_dir(issue_number)
+          path = File.join(dir, "#{adw_id}.yaml")
+          return nil unless File.exist?(path)
+
+          data = YAML.safe_load(File.read(path))
+          return nil unless data.is_a?(Hash)
+
+          {
+            adw_id:          data["adw_id"],
+            workflow_type:   data["workflow_type"],
+            comment_id:      data["comment_id"],
+            status:          data["status"],
+            plan_path:       data["plan_path"],
+            phase_comments:  data["phase_comments"] || {},
+            trigger_comment: data["trigger_comment"]
+          }
+        rescue Errno::ENOENT, Psych::SyntaxError
+          nil
+        end
+
+        def save(issue_number, tracker)
+          dir = workflows_dir(issue_number)
+          FileUtils.mkdir_p(dir)
+
+          data = {
+            "adw_id"          => tracker[:adw_id],
+            "workflow_type"   => tracker[:workflow_type],
+            "comment_id"      => tracker[:comment_id],
+            "status"          => tracker[:status],
+            "plan_path"       => tracker[:plan_path],
+            "phase_comments"  => tracker[:phase_comments] || {},
+            "trigger_comment" => tracker[:trigger_comment]
+          }
+
+          File.write(File.join(dir, "#{tracker[:adw_id]}.yaml"), YAML.dump(data))
+        end
+
+        def render_comment(tracker)
+          emoji = STATUS_EMOJIS.fetch(tracker[:status], "❓")
+
+          lines = []
+          lines << "## 🤖 ADW Workflow"
+          lines << ""
+          lines << "| Field | Value |"
+          lines << "|-------|-------|"
+          lines << "| **ADW ID** | `#{tracker[:adw_id]}` |"
+          lines << "| **Type** | #{tracker[:workflow_type]} |"
+          lines << "| **Status** | #{emoji} #{tracker[:status]} |"
+          if tracker[:trigger_comment]
+            trigger = tracker[:trigger_comment].to_s
+            trigger_preview = trigger.length > 80 ? "#{trigger[0..79]}..." : trigger
+            lines << "| **Trigger** | #{trigger_preview} |"
+          end
+          lines << "| **Plan** | `#{tracker[:plan_path]}` |" if tracker[:plan_path]
+          lines << ""
+          lines << WORKFLOW_COMMENT_MARKER
+
+          lines.join("\n")
+        end
+
+        def update(tracker, issue_number, new_status, logger)
+          unless STATUSES.include?(new_status)
+            raise ArgumentError, "Unknown tracker status: #{new_status}. Valid: #{STATUSES.join(', ')}"
+          end
+
+          old_status = tracker[:status]
+          tracker[:status] = new_status
+
+          body = render_comment(tracker)
+
+          if tracker[:comment_id]
+            Adw::GitHub.update_issue_comment(tracker[:comment_id], body)
+          else
+            comment_id = Adw::GitHub.create_issue_comment(issue_number, body)
+            tracker[:comment_id] = comment_id
+          end
+
+          old_label = old_status ? "adw/#{old_status}" : nil
+          Adw::GitHub.transition_label(issue_number, "adw/#{new_status}", old_label)
+
+          save(issue_number, tracker)
+
+          logger.info("Workflow tracker updated: adw/#{new_status}")
+        end
+
+        def set_phase_comment(tracker, phase, comment_id)
+          return unless comment_id
+
+          tracker[:phase_comments] ||= {}
+          tracker[:phase_comments][phase.to_s] = comment_id
+        end
+
+        private
+
+        def workflows_dir(issue_number)
+          File.join(Adw.project_root, ".issues", issue_number.to_s, "workflows")
+        end
       end
     end
   end

@@ -2,17 +2,16 @@
 
 module Adw
   module Actors
-    # Swaps the play chain context from main pipeline mode to patch mode.
-    # After this actor runs, all downstream actors operate on the patch_tracker
-    # (with _type: :patch) and use the patch-specific adw_id, logger, and agent prefix.
+    # Initializes the patch workflow context.
+    # Creates a fresh workflow tracker for the patch run and swaps adw_id/logger
+    # for downstream actors. The issue_tracker flows through unchanged.
     class InitializePatchContext < Actor
       include Adw::Actors::PipelineInputs
 
-      input :tracker            # main tracker (from InitializeTracker)
+      input :tracker            # workflow tracker from previous run (for label transition)
       input :comment_body
 
-      output :tracker           # replaced with patch_tracker
-      output :main_tracker      # preserved original for BuildPatchPlan and MarkPatchDone
+      output :tracker           # replaced with new patch workflow tracker
       output :adw_id            # replaced with patch_adw_id
       output :logger            # replaced with patch_logger
       output :agent_name_prefix # "patch_"
@@ -30,27 +29,26 @@ module Adw
       def call
         log_actor("Initializing patch context")
 
-        # Preserve main tracker
-        self.main_tracker = tracker
-
         # Create patch identity
         patch_adw_id = Adw::Utils.make_adw_id
         patch_logger = Adw::Utils.setup_logger(issue_number, patch_adw_id, "adw_patch")
 
-        # Create patch tracker with polymorphic type
-        patch_tracker = {
-          _type: :patch,
-          adw_id: patch_adw_id,
-          branch_name: tracker[:branch_name],
-          status: nil,
-          trigger_comment: comment_body,
-          patch_file: nil,
-          phase_comments: {}
-        }
-
-        # Transition both trackers
+        # Transition current workflow tracker to patching (label transition)
         Adw::Tracker.update(tracker, issue_number, "patching", logger)
-        Adw::Tracker.update_patch(patch_tracker, issue_number, "patching", patch_logger)
+
+        # Create a fresh workflow tracker for the patch
+        patch_tracker = Adw::Tracker::Workflow.create(
+          adw_id: patch_adw_id,
+          workflow_type: "patch",
+          trigger_comment: comment_body
+        )
+
+        # Register this workflow in the issue tracker
+        Adw::Tracker::Issue.add_workflow(issue_tracker, adw_id: patch_adw_id, type: "patch")
+        Adw::Tracker::Issue.save(issue_number, issue_tracker)
+
+        # Initialize the patch workflow tracker status
+        Adw::Tracker::Workflow.update(patch_tracker, issue_number, "patching", patch_logger)
 
         # Swap context for downstream actors
         self.tracker = patch_tracker

@@ -11,6 +11,7 @@ module Adw
         base.input :logger
         base.input :worktree_path, default: -> { nil }
         base.input :agent_name_prefix, default: -> { "" }
+        base.input :issue_tracker, default: -> { nil }
       end
 
       def log_actor(msg = "Starting")

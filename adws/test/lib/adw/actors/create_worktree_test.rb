@@ -11,10 +11,12 @@ class CreateWorktreeTest < Minitest::Test
     @logger = build_logger
     @branch_name = "issue-42"
     @worktree_path = "/abs/path/trees/#{@branch_name}"
-    @tracker = build_tracker
+    @tracker = build_workflow_tracker
+    @issue_tracker_data = build_issue_tracker
 
     Adw::Tracker.stubs(:update)
     Adw::Tracker.stubs(:save)
+    Adw::Tracker::Issue.stubs(:sync)
   end
 
   def test_generates_branch_and_creates_worktree
@@ -24,14 +26,15 @@ class CreateWorktreeTest < Minitest::Test
       issue_number: @issue_number,
       adw_id: @adw_id,
       logger: @logger,
-      tracker: @tracker
+      tracker: @tracker,
+      issue_tracker: @issue_tracker_data
     )
 
     assert result.success?
     assert_equal @branch_name, result.branch_name
     assert_equal @worktree_path, result.worktree_path
-    assert_equal @branch_name, result.tracker[:branch_name]
-    assert_equal @worktree_path, result.tracker[:worktree_path]
+    assert_equal @branch_name, result.issue_tracker[:branch_name]
+    assert_equal @worktree_path, result.issue_tracker[:worktree_path]
   end
 
   def test_fails_when_worktree_creation_fails
@@ -41,7 +44,8 @@ class CreateWorktreeTest < Minitest::Test
       issue_number: @issue_number,
       adw_id: @adw_id,
       logger: @logger,
-      tracker: @tracker
+      tracker: @tracker,
+      issue_tracker: @issue_tracker_data
     )
 
     refute result.success?
@@ -55,7 +59,8 @@ class CreateWorktreeTest < Minitest::Test
       issue_number: @issue_number,
       adw_id: @adw_id,
       logger: @logger,
-      tracker: @tracker
+      tracker: @tracker,
+      issue_tracker: @issue_tracker_data
     )
 
     assert_equal "issue-#{@issue_number}", result.branch_name

@@ -13,9 +13,9 @@ module Adw
 
       def call
         log_actor("Pushing branch to origin")
-        branch_name = tracker[:branch_name]
+        branch_name = issue_tracker[:branch_name]
         unless branch_name
-          fail!(error: "No branch_name in tracker, cannot push")
+          fail!(error: "No branch_name in issue_tracker, cannot push")
         end
 
         git_opts = worktree_path ? {chdir: worktree_path} : {}

@@ -9,6 +9,7 @@ module Adw
       input :issue
       input :issue_command
       input :tracker
+      output :issue_tracker
       output :tracker
       output :branch_name
 
@@ -40,7 +41,8 @@ module Adw
           fail!(error: "Git checkout failed: #{stderr.strip}")
         end
 
-        tracker[:branch_name] = name
+        issue_tracker[:branch_name] = name
+        Adw::Tracker::Issue.sync(issue_tracker, issue_number, logger)
         self.branch_name = name
         logger.info("Created and checked out branch: #{name}")
       end

@@ -8,12 +8,12 @@ module Adw
       include Adw::Actors::PipelineInputs
 
       input :tracker, default: -> { {} }
+      output :issue_tracker
       output :tracker
       output :branch_name
       output :worktree_path
 
       def call
-        tracker[:adw_id] ||= adw_id
         log_actor("Generating branch name and creating worktree")
         Adw::Tracker.update(tracker, issue_number, "creating_worktree", logger)
 
@@ -29,8 +29,9 @@ module Adw
         end
 
         path = stdout.strip
-        tracker[:branch_name] = name
-        tracker[:worktree_path] = path
+        issue_tracker[:branch_name] = name
+        issue_tracker[:worktree_path] = path
+        Adw::Tracker::Issue.sync(issue_tracker, issue_number, logger)
         self.branch_name = name
         self.worktree_path = path
         logger.info("Branch #{name} created, worktree at #{path}")

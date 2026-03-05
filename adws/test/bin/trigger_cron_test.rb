@@ -89,8 +89,16 @@ class TriggerCronTest < Minitest::Test
     assert_nil @cron.check_patch_trigger(1)
   end
 
-  def test_check_patch_trigger_tracker_comment_returns_nil
-    tracker_body = "Some text\n#{Adw::Tracker::COMMENT_MARKER}"
+  def test_check_patch_trigger_issue_tracker_comment_returns_nil
+    tracker_body = "Some text\n#{Adw::Tracker::ISSUE_COMMENT_MARKER}"
+    comments = [build_comment(id: "c1", body: tracker_body)]
+    Adw::GitHub.stubs(:fetch_issue_comments).with("owner/repo", 1).returns(comments)
+
+    assert_nil @cron.check_patch_trigger(1)
+  end
+
+  def test_check_patch_trigger_workflow_tracker_comment_returns_nil
+    tracker_body = "Some text\n#{Adw::Tracker::WORKFLOW_COMMENT_MARKER}"
     comments = [build_comment(id: "c1", body: tracker_body)]
     Adw::GitHub.stubs(:fetch_issue_comments).with("owner/repo", 1).returns(comments)
 
