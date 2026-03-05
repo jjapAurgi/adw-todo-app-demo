@@ -22,10 +22,17 @@ module Adw
         "Error: Claude Code CLI is not installed. #{e.message}"
       end
 
-      def claude_env
+      def claude_env(worktree_cwd: nil)
         project_bin = File.join(Adw.project_root, "bin")
+
+        # When running in a worktree, disable CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR.
+        # Worktrees live inside trees/ under the main repo, so Claude Code walks up
+        # and resolves the project root to the parent repo — causing all bash commands
+        # to execute in the main repo instead of the worktree.
+        maintain_cwd = worktree_cwd ? "false" : ENV.fetch("CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR", "true")
+
         env = {
-          "CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR" => ENV.fetch("CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR", "true"),
+          "CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR" => maintain_cwd,
           "HOME" => ENV["HOME"],
           "USER" => ENV["USER"],
           "PATH" => "#{project_bin}:#{ENV['PATH']}",
@@ -112,7 +119,7 @@ module Adw
         cmd.push("--dangerously-skip-permissions") if request.dangerously_skip_permissions
 
         # Set up environment
-        env = claude_env
+        env = claude_env(worktree_cwd: request.cwd)
 
         begin
           stderr_output = ""
