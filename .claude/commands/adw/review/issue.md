@@ -40,19 +40,26 @@ PLAN_PATH: $2 - Ruta al fichero del plan de implementacion
 - Extrae el numero de issue del JSON de ISSUE.
 - Crea el directorio de evidencia: `mkdir -p .issues/{issue_number}/evidences`
 
-### Paso 3: Verificar que la aplicacion esta corriendo
-- Comprueba si el backend responde: `curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/tasks`
-- Comprueba si el frontend responde: `curl -s -o /dev/null -w "%{http_code}" http://localhost:5173`
+### Paso 3: Determinar puertos de la aplicacion
+- Ejecuta el siguiente comando bash para obtener los puertos (lee `.env.local` si existe, o usa defaults):
+  ```bash
+  if [ -f .env.local ]; then source .env.local; fi && echo "BACKEND_PORT=${PORT:-3000} FRONTEND_PORT=${VITE_PORT:-5173}"
+  ```
+- Usa los valores obtenidos (BACKEND_PORT y FRONTEND_PORT) en todos los pasos siguientes.
+
+### Paso 4: Verificar que la aplicacion esta corriendo
+- Comprueba si el backend responde: `curl -s -o /dev/null -w "%{http_code}" http://localhost:{BACKEND_PORT}/tasks`
+- Comprueba si el frontend responde: `curl -s -o /dev/null -w "%{http_code}" http://localhost:{FRONTEND_PORT}`
 - Si alguno no responde, intenta arrancarlo:
-  - Backend: `cd backend && bin/dev &` (background, esperar 10s)
-  - Frontend: `cd frontend && bin/dev &` (background, esperar 10s)
+  - Backend: `cd backend && PORT={BACKEND_PORT} bin/dev &` (background, esperar 10s)
+  - Frontend: `cd frontend && VITE_PORT={FRONTEND_PORT} bin/dev &` (background, esperar 10s)
 - Reintenta las comprobaciones.
 - Si aun no responde, reporta error en el JSON de salida.
 
-### Paso 4: Tomar capturas de pantalla
+### Paso 5: Tomar capturas de pantalla
 - Crea un script temporal de Node.js en `.issues/{issue_number}/adw_review_issue.js` que use Playwright para:
   1. Abrir el navegador Chromium en modo headless.
-  2. Navegar a http://localhost:5173 (pagina principal).
+  2. Navegar a http://localhost:{FRONTEND_PORT} (pagina principal).
   3. Esperar a que la pagina cargue completamente (networkidle).
   4. Tomar una captura de pantalla de pantalla completa.
   5. Si el plan o la issue mencionan interacciones especificas (crear tarea, completar tarea, filtrar, etc.), realizarlas y tomar capturas adicionales.
@@ -62,13 +69,13 @@ PLAN_PATH: $2 - Ruta al fichero del plan de implementacion
 - IMPORTANTE: Apunta hacia 1-5 capturas enfocadas en la funcionalidad critica.
 - IMPORTANTE: Usa nombres descriptivos: `01_vista_principal.png`, `02_formulario_tarea.png`, etc.
 
-### Paso 5: Evaluar adherencia al plan
+### Paso 6: Evaluar adherencia al plan
 - Compara los requisitos de la issue con lo implementado (diff + capturas).
 - Evalua si todos los criterios de aceptacion se cumplen.
 - Marca como PASS si la implementacion cumple con los requisitos.
 - Marca como FAIL si faltan funcionalidades o no se cumplen criterios.
 
-### Paso 6: Verificar resultados
+### Paso 7: Verificar resultados
 - Comprueba que las capturas se crearon correctamente.
 - Lista los ficheros en `.issues/{issue_number}/evidences/`.
 
