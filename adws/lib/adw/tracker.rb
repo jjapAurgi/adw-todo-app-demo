@@ -298,7 +298,7 @@ module Adw
           File.write(File.join(dir, "#{tracker[:adw_id]}.yaml"), YAML.dump(data))
         end
 
-        def render_comment(tracker)
+        def render_comment(tracker, issue_number = nil)
           emoji = STATUS_EMOJIS.fetch(tracker[:status], "❓")
 
           lines = []
@@ -314,7 +314,13 @@ module Adw
             trigger_preview = trigger.length > 80 ? "#{trigger[0..79]}..." : trigger
             lines << "| **Trigger** | #{trigger_preview} |"
           end
-          lines << "| **Plan** | `#{tracker[:plan_path]}` |" if tracker[:plan_path]
+          plan_comment_id = tracker[:phase_comments] && tracker[:phase_comments]["plan"]
+          if plan_comment_id && issue_number
+            plan_url = comment_url(issue_number, plan_comment_id)
+            lines << "| **Plan** | [View plan](#{plan_url}) |"
+          elsif tracker[:plan_path]
+            lines << "| **Plan** | `#{tracker[:plan_path]}` |"
+          end
           lines << ""
           lines << WORKFLOW_COMMENT_MARKER
 
@@ -329,7 +335,7 @@ module Adw
           old_status = tracker[:status]
           tracker[:status] = new_status
 
-          body = render_comment(tracker)
+          body = render_comment(tracker, issue_number)
 
           if tracker[:comment_id]
             Adw::GitHub.update_issue_comment(tracker[:comment_id], body)
@@ -357,6 +363,11 @@ module Adw
 
         def workflows_dir(issue_number)
           File.join(Adw.project_root, ".issues", issue_number.to_s, "workflows")
+        end
+
+        def comment_url(issue_number, comment_id)
+          repo_path = Adw::GitHub.extract_repo_path(Adw::GitHub.repo_url)
+          "https://github.com/#{repo_path}/issues/#{issue_number}#issuecomment-#{comment_id}"
         end
       end
     end
