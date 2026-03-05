@@ -15,7 +15,8 @@ module Adw
         log_actor("Starting environment: #{path}")
         Adw::Tracker.update(tracker, issue_number, "starting", logger)
 
-        script = File.join(Adw.project_root, "adws", "bin", "worktree", "start")
+        adws_root = File.expand_path("../../..", __dir__)
+        script = File.join(adws_root, "bin", "worktree", "start")
         _, stderr, status = Open3.capture3(script, path)
 
         unless status.success?

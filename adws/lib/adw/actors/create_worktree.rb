@@ -20,7 +20,8 @@ module Adw
         name = "issue-#{issue_number}"
         logger.info("Generated branch name: #{name}")
 
-        script = File.join(Adw.project_root, "adws", "bin", "worktree_create")
+        adws_root = File.expand_path("../../..", __dir__)
+        script = File.join(adws_root, "bin", "worktree_create")
         stdout, stderr, status = Open3.capture3(script, name)
 
         unless status.success?

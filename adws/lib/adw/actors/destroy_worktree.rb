@@ -19,7 +19,8 @@ module Adw
 
         log_actor("Destroying worktree: #{wt_path}")
 
-        script = File.join(Adw.project_root, "adws", "bin", "worktree", "destroy")
+        adws_root = File.expand_path("../../..", __dir__)
+        script = File.join(adws_root, "bin", "worktree", "destroy")
         _, stderr, status = Open3.capture3(script, wt_path)
 
         unless status.success?
