@@ -18,10 +18,10 @@ module Adw
       def call
         log_actor("Building patch plan")
 
-        patch_file = ".issues/#{issue_number}/patch-#{issue_number}-#{adw_id}.md"
         original_plan = Adw::PipelineHelpers.plan_path_for(issue_number)
 
-        args = [comment_body, patch_file]
+        # Args must match /adw:patch command spec: $1=adw_id, $2=review_change_request, $3=issue_number, $4=spec_path
+        args = [adw_id, comment_body, issue_number.to_s]
         args << original_plan if File.exist?(original_plan)
 
         request = Adw::AgentTemplateRequest.new(
@@ -30,7 +30,8 @@ module Adw
           args: args,
           issue_number: issue_number,
           adw_id: adw_id,
-          model: "opus"
+          model: "opus",
+          cwd: worktree_path
         )
 
         response = Adw::Agent.execute_template(request)
@@ -39,6 +40,14 @@ module Adw
           Adw::Tracker.update(tracker, issue_number, "error", logger)
           Adw::Tracker.update(main_tracker, issue_number, "done", logger) if main_tracker
           fail!(error: "Patch plan creation failed: #{response.output}")
+        end
+
+        # The /adw:patch command returns the actual file path it created
+        # (naming: patch-{n}-{descriptive-name}.md, not predictable by the actor)
+        patch_file = response.output.strip
+        if patch_file.empty?
+          patch_file = ".issues/#{issue_number}/patch-#{issue_number}-#{adw_id}.md"
+          logger.warn("Agent did not return patch file path, using fallback: #{patch_file}")
         end
 
         tracker[:patch_file] = patch_file
