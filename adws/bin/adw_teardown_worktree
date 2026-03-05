@@ -25,20 +25,19 @@ if issue_number == 0
   exit 1
 end
 
-logger  = Adw::Utils.setup_logger(issue_number, adw_id, "adw_teardown_worktree")
-tracker = Adw::Tracker.load(issue_number) || {}
-tracker[:adw_id] ||= adw_id
+logger        = Adw::Utils.setup_logger(issue_number, adw_id, "adw_teardown_worktree")
+issue_tracker = Adw::Tracker::Issue.load(issue_number) || {}
 
-if tracker[:worktree_path].nil?
+if issue_tracker[:worktree_path].nil?
   candidate = File.join(Adw.project_root, "trees", branch_name)
-  tracker[:worktree_path] = candidate if Dir.exist?(candidate)
+  issue_tracker[:worktree_path] = candidate if Dir.exist?(candidate)
 end
 
 result = Adw::Actors::DestroyWorktree.result(
   issue_number: issue_number,
   adw_id: adw_id,
   logger: logger,
-  tracker: tracker
+  issue_tracker: issue_tracker
 )
 
 unless result.success?
