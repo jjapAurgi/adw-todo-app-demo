@@ -15,6 +15,12 @@ if [[ -f "${MAIN_REPO}/adws/.env" ]]; then
   echo "Copied ${MAIN_REPO}/adws/.env → ${WORKTREE_PATH}/adws/.env" >&2
 fi
 
+# Copy .gh (GitHub CLI config) from main repo
+if [[ -d "${MAIN_REPO}/.gh" ]]; then
+  cp -r "${MAIN_REPO}/.gh" "${WORKTREE_PATH}/.gh"
+  echo "Copied ${MAIN_REPO}/.gh → ${WORKTREE_PATH}/.gh" >&2
+fi
+
 # Derive branch name from git
 BRANCH_NAME="$(git -C "${WORKTREE_PATH}" rev-parse --abbrev-ref HEAD)"
 
