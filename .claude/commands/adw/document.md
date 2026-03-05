@@ -17,8 +17,13 @@ Genera documentacion concisa en markdown para los cambios implementados, analiza
 
 adw_id: $1
 spec_path: $2 si se proporciona, de lo contrario dejalo en blanco
+project_dir: $3 (opcional) - Directorio raiz del proyecto. Si se proporciona, usa esta ruta como base para todas las operaciones de ficheros (Write, Edit, Read). Si no se proporciona, usa el directorio de trabajo actual.
 
 ## Instrucciones
+
+### 0. Resolver Directorio Base
+- Si `project_dir` esta proporcionado, todas las rutas absolutas para operaciones de ficheros (Write, Edit, Read) deben construirse con `project_dir` como prefijo. Ejemplo: `{project_dir}/app_docs/feature.md`
+- Si `project_dir` no esta proporcionado, usa el directorio de trabajo actual como base
 
 ### 1. Analizar Cambios
 - Ejecuta `git diff origin/main --stat` para ver ficheros cambiados y lineas modificadas

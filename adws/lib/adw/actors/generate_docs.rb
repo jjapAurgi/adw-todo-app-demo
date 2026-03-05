@@ -19,7 +19,7 @@ module Adw
         request = Adw::AgentTemplateRequest.new(
           agent_name: "documentation_generator",
           slash_command: "/adw:document",
-          args: [adw_id, plan_path],
+          args: [adw_id, plan_path, worktree_path].compact,
           issue_number: issue_number,
           adw_id: adw_id,
           model: "sonnet",
