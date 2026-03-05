@@ -116,7 +116,7 @@ module Adw
         cmd.push("--model", request.model)
         cmd.push("--output-format", "stream-json")
         cmd.push("--verbose")
-        cmd.push("--dangerously-skip-permissions") if request.dangerously_skip_permissions
+        cmd.push("--allowedTools", "Bash", "Read", "Write", "Edit", "Glob", "Grep", "WebFetch", "WebSearch") if request.dangerously_skip_permissions
 
         # Set up environment
         env = claude_env(worktree_cwd: request.cwd)
