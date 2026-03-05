@@ -45,7 +45,8 @@ module Adw
           issue_number: issue_number,
           adw_id: adw_id,
           logger: logger,
-          comment_body: comment_body
+          comment_body: comment_body,
+          workflow_type: "patch"
         )
         unless setup.success?
           fail!(error: setup.error)

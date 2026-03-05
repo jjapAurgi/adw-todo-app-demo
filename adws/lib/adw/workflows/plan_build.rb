@@ -6,6 +6,7 @@ module Adw
       input :issue_number
       input :adw_id
       input :logger
+      input :workflow_type, default: -> { "plan_build" }
 
       play Adw::Actors::InitializeIssueTracker,
            Adw::Actors::InitializeWorkflowTracker,
