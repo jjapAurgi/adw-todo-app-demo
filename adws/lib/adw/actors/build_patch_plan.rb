@@ -39,7 +39,7 @@ module Adw
           fail!(error: "Patch plan creation failed: #{response.output}")
         end
 
-        plan_file = response.output.strip
+        plan_file = response.output.strip.delete("`")
         if plan_file.empty?
           plan_file = ".issues/#{issue_number}/patch-#{issue_number}-#{adw_id}.md"
           logger.warn("Agent did not return patch file path, using fallback: #{plan_file}")
