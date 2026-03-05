@@ -21,7 +21,8 @@ module Adw
           args: [branch_name, issue.to_json, adw_id],
           issue_number: issue_number,
           adw_id: adw_id,
-          model: "sonnet"
+          model: "sonnet",
+          cwd: worktree_path
         )
 
         response = Adw::Agent.execute_template(request)

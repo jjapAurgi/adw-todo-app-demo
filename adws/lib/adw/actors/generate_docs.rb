@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "pathname"
+
 module Adw
   module Actors
     class GenerateDocs < Actor
@@ -20,7 +22,8 @@ module Adw
           args: [adw_id, plan_path],
           issue_number: issue_number,
           adw_id: adw_id,
-          model: "sonnet"
+          model: "sonnet",
+          cwd: worktree_path
         )
 
         logger.info("Running documentation generation...")
@@ -43,7 +46,12 @@ module Adw
       private
 
       def post_documentation_summary(doc_path)
-        content = File.read(doc_path)
+        full_path = if worktree_path && !Pathname.new(doc_path).absolute?
+                      File.join(worktree_path, doc_path)
+                    else
+                      doc_path
+                    end
+        content = File.read(full_path)
         parts = ["## Documentation Updated", "", "`#{doc_path}`", ""]
 
         if content =~ /## Overview\s*\n(.*?)(?=\n## )/m
